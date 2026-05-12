@@ -28,43 +28,71 @@ var (
 
 type DialogModel struct {
 	Title    string
+	body     string
 	viewport viewport.Model
+	termW    int
+	termH    int
 	width    int
 	height   int
 }
 
-func NewDialog(width, height int) DialogModel {
-	w := min(width-10, 70)
-	h := min(height-10, 18)
-	if w < 30 {
-		w = 30
-	}
-	if h < 5 {
-		h = 5
-	}
-	vp := viewport.New(w, h)
+func NewDialog(termW, termH int) DialogModel {
+	vp := viewport.New(30, 5)
 	return DialogModel{
 		viewport: vp,
-		width:    w,
-		height:   h,
+		termW:    termW,
+		termH:    termH,
 	}
 }
 
 func (d *DialogModel) SetContent(title, body string) {
 	d.Title = title
+	d.body = body
+	d.resize()
 	d.viewport.SetContent(body)
 	d.viewport.GotoTop()
 }
 
-func (d *DialogModel) SetSize(width, height int) {
-	w := min(width-10, 70)
-	h := min(height-10, 18)
+func (d *DialogModel) SetSize(termW, termH int) {
+	d.termW = termW
+	d.termH = termH
+	if d.body != "" {
+		d.resize()
+		d.viewport.SetContent(d.body)
+	}
+}
+
+func (d *DialogModel) resize() {
+	// Measure content dimensions
+	lines := strings.Split(d.body, "\n")
+	contentHeight := len(lines)
+	contentWidth := len(d.Title)
+	for _, line := range lines {
+		if len(line) > contentWidth {
+			contentWidth = len(line)
+		}
+	}
+
+	// dialog chrome: border (2) + padding (2) horizontally; border (2) + title (1) + sep (1) + sep (1) + footer (1) = 6 vertically
+	maxW := d.termW - 6
+	maxH := d.termH - 8
+
+	w := contentWidth + 2
+	if w > maxW {
+		w = maxW
+	}
 	if w < 30 {
 		w = 30
 	}
-	if h < 5 {
-		h = 5
+
+	h := contentHeight
+	if h > maxH {
+		h = maxH
 	}
+	if h < 3 {
+		h = 3
+	}
+
 	d.width = w
 	d.height = h
 	d.viewport.Width = w

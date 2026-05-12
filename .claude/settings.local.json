@@ -21,7 +21,8 @@
       "Bash(make build *)",
       "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go doc github.com/charmbracelet/bubbles/list)",
       "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go doc *)",
-      "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go list github.com/containerd/containerd/...)"
+      "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go list github.com/containerd/containerd/...)",
+      "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go list github.com/containerd/containerd/v2/...)"
     ]
   }
 }

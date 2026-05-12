@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/snapshots"
 
@@ -142,7 +141,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tasksRefreshedMsg:
-		m.resources[2].UpdateData([]*tasktypes.Process(msg))
+		m.resources[2].UpdateData([]ctr.TaskInfo(msg))
 		return m, nil
 
 	case snapshotsRefreshedMsg:
@@ -224,7 +223,7 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	default:
 		switch {
-		case key.Matches(msg, keys.Quit):
+		case key.Matches(msg, keys.Quit), key.Matches(msg, keys.Escape):
 			return m, tea.Quit
 
 		case key.Matches(msg, keys.SelectNS):
@@ -400,7 +399,7 @@ func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 		if err != nil {
 			return errorMsg{err: err}
 		}
-		tasks, err := client.Tasks(ctx, ns)
+		tasks, err := client.TasksWithSpec(ctx, ns)
 		if err != nil {
 			return errorMsg{err: err}
 		}
@@ -420,7 +419,7 @@ func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 
 type imagesRefreshedMsg []ctr.ImageTree
 type containersRefreshedMsg []containers.Container
-type tasksRefreshedMsg []*tasktypes.Process
+type tasksRefreshedMsg []ctr.TaskInfo
 type snapshotsRefreshedMsg []snapshots.Info
 
 func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd {
@@ -440,7 +439,7 @@ func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd 
 			}
 			return containersRefreshedMsg(ctrs)
 		case strings.HasPrefix(topic, "/tasks/"):
-			tasks, err := client.Tasks(ctx, ns)
+			tasks, err := client.TasksWithSpec(ctx, ns)
 			if err != nil {
 				return errorMsg{err: err}
 			}

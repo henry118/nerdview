@@ -24,7 +24,7 @@ func HelpView(width int) string {
 		helpKeyStyle.Render("s") + helpBarStyle.Render(":snapshotter  "),
 		helpKeyStyle.Render("Space") + helpBarStyle.Render(":fold  "),
 		helpKeyStyle.Render("Enter") + helpBarStyle.Render(":detail  "),
-		helpKeyStyle.Render("q") + helpBarStyle.Render(":quit"),
+		helpKeyStyle.Render("Esc") + helpBarStyle.Render(":quit"),
 	}
 	text := strings.Join(parts, "")
 	textWidth := lipgloss.Width(text)

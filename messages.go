@@ -1,7 +1,6 @@
 package main
 
 import (
-	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/henry118/nerdtui/ctr"
@@ -15,7 +14,7 @@ type resourcesLoadedMsg struct {
 	namespace  string
 	images     []ctr.ImageTree
 	containers []containers.Container
-	tasks      []*tasktypes.Process
+	tasks      []ctr.TaskInfo
 	snapshots  []snapshots.Info
 }
 

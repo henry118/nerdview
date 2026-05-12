@@ -13,6 +13,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type Client struct {
@@ -52,15 +53,6 @@ func (c *Client) Namespaces(ctx context.Context) ([]string, error) {
 func (c *Client) Containers(ctx context.Context, ns string) ([]containers.Container, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	return c.inner.ContainerService().List(ctx)
-}
-
-func (c *Client) Tasks(ctx context.Context, ns string) ([]*tasktypes.Process, error) {
-	ctx = namespaces.WithNamespace(ctx, ns)
-	resp, err := c.inner.TaskService().List(ctx, &tasks.ListTasksRequest{})
-	if err != nil {
-		return nil, err
-	}
-	return resp.Tasks, nil
 }
 
 func (c *Client) Snapshots(ctx context.Context, ns string, snapshotter string) ([]snapshots.Info, error) {
@@ -117,6 +109,43 @@ func walkContent(ctx context.Context, store content.Store, desc ocispec.Descript
 	}
 	return result
 }
+
+type TaskInfo struct {
+	Process    *tasktypes.Process
+	Spec       *specs.Spec
+	BundlePath string
+}
+
+func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, error) {
+	ctx = namespaces.WithNamespace(ctx, ns)
+	resp, err := c.inner.TaskService().List(ctx, &tasks.ListTasksRequest{})
+	if err != nil {
+		return nil, err
+	}
+	actualNS := namespaces.Default
+	if n, ok := namespaces.Namespace(ctx); ok {
+		actualNS = n
+	}
+	var result []TaskInfo
+	for _, p := range resp.Tasks {
+		info := TaskInfo{Process: p}
+		container, err := c.inner.LoadContainer(ctx, p.ID)
+		if err == nil {
+			cInfo, err := container.Info(ctx)
+			if err == nil {
+				info.BundlePath = "/run/containerd/" + cInfo.Runtime.Name + "/" + actualNS + "/" + p.ID
+			}
+			spec, err := container.Spec(ctx)
+			if err == nil {
+				info.Spec = spec
+			}
+		}
+		result = append(result, info)
+	}
+	return result, nil
+}
+
+
 
 func (c *Client) Snapshotters(ctx context.Context) ([]string, error) {
 	resp, err := c.inner.IntrospectionService().Plugins(ctx, "type==io.containerd.snapshotter.v1")
