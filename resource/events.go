@@ -21,7 +21,7 @@ var EventKind = Kind{
 		{Title: "Namespace", MinWidth: 14},
 		{Title: "Topic", MinWidth: 20, Flex: true},
 	},
-	ToRows: func(data any) []table.Row {
+	ToRows: func(data any, folded map[string]bool) []table.Row {
 		evts, ok := data.([]Event)
 		if !ok || len(evts) == 0 {
 			return nil
@@ -36,7 +36,7 @@ var EventKind = Kind{
 		}
 		return rows
 	},
-	ToDetail: func(data any, index int) (string, string) {
+	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
 		evts, ok := data.([]Event)
 		if !ok || index < 0 || index >= len(evts) {
 			return "", ""

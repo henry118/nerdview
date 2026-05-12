@@ -17,7 +17,7 @@ var ContainerKind = Kind{
 		{Title: "Runtime", MinWidth: 16},
 		{Title: "Created", MinWidth: 20},
 	},
-	ToRows: func(data any) []table.Row {
+	ToRows: func(data any, folded map[string]bool) []table.Row {
 		ctrs, ok := data.([]containers.Container)
 		if !ok || len(ctrs) == 0 {
 			return nil
@@ -37,7 +37,7 @@ var ContainerKind = Kind{
 		}
 		return rows
 	},
-	ToDetail: func(data any, index int) (string, string) {
+	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
 		ctrs, ok := data.([]containers.Container)
 		if !ok || index < 0 || index >= len(ctrs) {
 			return "", ""

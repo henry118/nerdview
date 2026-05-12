@@ -11,14 +11,21 @@ type Column struct {
 type Kind struct {
 	Name     string
 	Columns  []Column
-	ToRows   func(data any) []table.Row
-	ToDetail func(data any, index int) (title string, body string)
+	ToRows   func(data any, folded map[string]bool) []table.Row
+	// RowID returns a unique fold key for the row at index.
+	// If nil, folding is not supported for this kind.
+	RowID func(data any, folded map[string]bool, index int) string
+	// InitFolded returns the default folded set for new data.
+	// If nil, nothing is folded by default.
+	InitFolded func(data any) map[string]bool
+	ToDetail   func(data any, folded map[string]bool, index int) (title string, body string)
 }
 
 type Tab struct {
 	Kind    Kind
 	Table   table.Model
 	RawData any
+	Folded  map[string]bool
 	width   int
 }
 
@@ -35,9 +42,10 @@ func NewTab(kind Kind, width, height int) Tab {
 	t.SetStyles(s)
 
 	return Tab{
-		Kind:  kind,
-		Table: t,
-		width: width,
+		Kind:   kind,
+		Table:  t,
+		Folded: make(map[string]bool),
+		width:  width,
 	}
 }
 
@@ -48,10 +56,39 @@ func (t *Tab) SetWidth(width int) {
 }
 
 func (t *Tab) UpdateData(data any) {
+	firstLoad := t.RawData == nil
 	t.RawData = data
-	rows := t.Kind.ToRows(data)
+	if firstLoad && t.Kind.InitFolded != nil {
+		t.Folded = t.Kind.InitFolded(data)
+	}
+	t.refreshRows()
+}
+
+func (t *Tab) refreshRows() {
+	rows := t.Kind.ToRows(t.RawData, t.Folded)
 	t.Table.SetRows(rows)
 	t.recalcColumns()
+}
+
+func (t *Tab) ToggleFold() {
+	if t.Kind.RowID == nil || t.RawData == nil {
+		return
+	}
+	idx := t.Table.Cursor()
+	id := t.Kind.RowID(t.RawData, t.Folded, idx)
+	if id == "" {
+		return
+	}
+	if t.Folded[id] {
+		delete(t.Folded, id)
+	} else {
+		t.Folded[id] = true
+	}
+	t.refreshRows()
+}
+
+func (t *Tab) CanFold() bool {
+	return t.Kind.RowID != nil
 }
 
 func (t *Tab) recalcColumns() {
@@ -65,11 +102,9 @@ func (t *Tab) SelectedDetail() (string, string) {
 		return "", ""
 	}
 	idx := t.Table.Cursor()
-	return t.Kind.ToDetail(t.RawData, idx)
+	return t.Kind.ToDetail(t.RawData, t.Folded, idx)
 }
 
-// fitColumns sizes each column just wide enough to show its content.
-// If the total exceeds terminal width, flex columns get shrunk back to MinWidth.
 func fitColumns(defs []Column, rows []table.Row, totalWidth int) []table.Column {
 	cols := make([]table.Column, len(defs))
 
@@ -92,7 +127,6 @@ func fitColumns(defs []Column, rows []table.Row, totalWidth int) []table.Column 
 		}
 	}
 
-	// If total exceeds available width, shrink flex columns
 	total := 0
 	for _, w := range widths {
 		total += w

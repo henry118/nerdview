@@ -15,7 +15,7 @@ var TaskKind = Kind{
 		{Title: "PID", MinWidth: 8},
 		{Title: "Status", MinWidth: 12},
 	},
-	ToRows: func(data any) []table.Row {
+	ToRows: func(data any, folded map[string]bool) []table.Row {
 		procs, ok := data.([]*tasktypes.Process)
 		if !ok || len(procs) == 0 {
 			return nil
@@ -34,7 +34,7 @@ var TaskKind = Kind{
 		}
 		return rows
 	},
-	ToDetail: func(data any, index int) (string, string) {
+	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
 		procs, ok := data.([]*tasktypes.Process)
 		if !ok || index < 0 || index >= len(procs) {
 			return "", ""

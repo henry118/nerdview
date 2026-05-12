@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/snapshots"
 
 	"github.com/henry118/nerdtui/ctr"
@@ -135,7 +134,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case imagesRefreshedMsg:
-		m.resources[0].UpdateData([]images.Image(msg))
+		m.resources[0].UpdateData([]ctr.ImageTree(msg))
 		return m, nil
 
 	case containersRefreshedMsg:
@@ -256,6 +255,13 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.resources[m.activeRes].Table.Blur()
 			m.activeRes = (m.activeRes - 1 + len(m.resources)) % len(m.resources)
 			m.resources[m.activeRes].Table.Focus()
+			return m, nil
+
+		case key.Matches(msg, keys.ToggleFold):
+			tab := m.resources[m.activeRes]
+			if tab.CanFold() {
+				tab.ToggleFold()
+			}
 			return m, nil
 
 		case key.Matches(msg, keys.Enter):
@@ -386,7 +392,7 @@ func loadNamespaces(client *ctr.Client) tea.Cmd {
 func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		imgs, err := client.Images(ctx, ns)
+		imgs, err := client.ImageTrees(ctx, ns)
 		if err != nil {
 			return errorMsg{err: err}
 		}
@@ -412,7 +418,7 @@ func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 	}
 }
 
-type imagesRefreshedMsg []images.Image
+type imagesRefreshedMsg []ctr.ImageTree
 type containersRefreshedMsg []containers.Container
 type tasksRefreshedMsg []*tasktypes.Process
 type snapshotsRefreshedMsg []snapshots.Info
@@ -422,7 +428,7 @@ func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd 
 		ctx := context.Background()
 		switch {
 		case strings.HasPrefix(topic, "/images/"):
-			imgs, err := client.Images(ctx, ns)
+			imgs, err := client.ImageTrees(ctx, ns)
 			if err != nil {
 				return errorMsg{err: err}
 			}

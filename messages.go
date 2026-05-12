@@ -3,8 +3,8 @@ package main
 import (
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/henry118/nerdtui/ctr"
 )
 
 type namespacesLoadedMsg struct {
@@ -13,7 +13,7 @@ type namespacesLoadedMsg struct {
 
 type resourcesLoadedMsg struct {
 	namespace  string
-	images     []images.Image
+	images     []ctr.ImageTree
 	containers []containers.Container
 	tasks      []*tasktypes.Process
 	snapshots  []snapshots.Info
