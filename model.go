@@ -12,6 +12,7 @@ import (
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/snapshots"
 
 	"github.com/henry118/nerdtui/ctr"
 	"github.com/henry118/nerdtui/resource"
@@ -26,31 +27,37 @@ const (
 	modeNormal viewMode = iota
 	modeDialog
 	modeNSSelect
+	modeSnapshotterSelect
 )
 
 type model struct {
-	client     *ctr.Client
-	namespaces []string
-	activeNS   int
-	resources  []*resource.Tab
-	activeRes  int
-	events     []resource.Event
-	dialog     ui.DialogModel
-	mode       viewMode
-	nsCursor   int
-	width      int
-	height     int
-	err        error
+	client       *ctr.Client
+	namespaces   []string
+	activeNS     int
+	snapshotter  string
+	snapshotters []string
+	snCursor     int
+	resources    []*resource.Tab
+	activeRes    int
+	events       []resource.Event
+	dialog       ui.DialogModel
+	mode         viewMode
+	nsCursor     int
+	width        int
+	height       int
+	err          error
 }
 
 func newModel(client *ctr.Client, namespace string) model {
 	return model{
-		client:     client,
-		namespaces: []string{namespace},
+		client:      client,
+		namespaces:  []string{namespace},
+		snapshotter: "overlayfs",
 		resources: []*resource.Tab{
 			ptab(resource.NewTab(resource.ImageKind, 80, 10)),
 			ptab(resource.NewTab(resource.ContainerKind, 80, 10)),
 			ptab(resource.NewTab(resource.TaskKind, 80, 10)),
+			ptab(resource.NewTab(resource.SnapshotKind, 80, 10)),
 			ptab(resource.NewTab(resource.EventKind, 80, 10)),
 		},
 		dialog: ui.NewDialog(80, 24),
@@ -62,7 +69,8 @@ func ptab(t resource.Tab) *resource.Tab { return &t }
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		loadNamespaces(m.client),
-		loadResources(m.client, m.namespaces[m.activeNS]),
+		loadSnapshotters(m.client),
+		loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter),
 		ctr.WaitForEvent(m.client),
 		tickCmd(),
 	)
@@ -73,13 +81,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// overhead: header (1) + tab bar (1) + help bar (1) = 3
-		tableHeight := m.height - 3
+		// overhead: header (1) + blank (1) + tab bar (1) + help bar (1) = 4
+		tableHeight := m.height - 4
 		if tableHeight < 3 {
 			tableHeight = 3
 		}
 		for _, tab := range m.resources {
-			tab.Table.SetWidth(m.width)
+			tab.SetWidth(m.width)
 			tab.Table.SetHeight(tableHeight)
 		}
 		m.dialog.SetSize(m.width, m.height)
@@ -92,11 +100,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case snapshottersLoadedMsg:
+		m.snapshotters = msg.snapshotters
+		return m, nil
+
 	case resourcesLoadedMsg:
 		if msg.namespace == m.namespaces[m.activeNS] {
 			m.resources[0].UpdateData(msg.images)
 			m.resources[1].UpdateData(msg.containers)
 			m.resources[2].UpdateData(msg.tasks)
+			m.resources[3].UpdateData(msg.snapshots)
 		}
 		return m, nil
 
@@ -104,7 +117,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmds []tea.Cmd
 		cmds = append(cmds, ctr.WaitForEvent(m.client))
 		if msg.Namespace == m.namespaces[m.activeNS] {
-			cmds = append(cmds, refreshResource(m.client, m.namespaces[m.activeNS], msg.Topic))
+			cmds = append(cmds, refreshResource(m.client, m.namespaces[m.activeNS], m.snapshotter, msg.Topic))
 		}
 		m.events = append([]resource.Event{{
 			Timestamp: msg.Timestamp,
@@ -114,7 +127,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.events) > maxEvents {
 			m.events = m.events[:maxEvents]
 		}
-		m.resources[3].UpdateData(m.events)
+		m.resources[4].UpdateData(m.events)
 		return m, tea.Batch(cmds...)
 
 	case ctr.EventErrMsg:
@@ -133,13 +146,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resources[2].UpdateData([]*tasktypes.Process(msg))
 		return m, nil
 
+	case snapshotsRefreshedMsg:
+		m.resources[3].UpdateData([]snapshots.Info(msg))
+		return m, nil
+
 	case errorMsg:
 		m.err = msg.err
 		return m, nil
 
 	case tickMsg:
 		return m, tea.Batch(
-			loadResources(m.client, m.namespaces[m.activeNS]),
+			loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter),
 			tickCmd(),
 		)
 
@@ -180,7 +197,29 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.activeNS = m.nsCursor
 			m.mode = modeNormal
-			return m, loadResources(m.client, m.namespaces[m.activeNS])
+			return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
+		}
+		return m, nil
+
+	case modeSnapshotterSelect:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.mode = modeNormal
+			return m, nil
+		case key.Matches(msg, keys.Up):
+			if m.snCursor > 0 {
+				m.snCursor--
+			}
+			return m, nil
+		case key.Matches(msg, keys.Down):
+			if m.snCursor < len(m.snapshotters)-1 {
+				m.snCursor++
+			}
+			return m, nil
+		case key.Matches(msg, keys.Enter):
+			m.snapshotter = m.snapshotters[m.snCursor]
+			m.mode = modeNormal
+			return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
 		}
 		return m, nil
 
@@ -192,6 +231,19 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.SelectNS):
 			m.nsCursor = m.activeNS
 			m.mode = modeNSSelect
+			return m, nil
+
+		case key.Matches(msg, keys.SelectSnapshotter):
+			if len(m.snapshotters) > 0 {
+				m.snCursor = 0
+				for i, s := range m.snapshotters {
+					if s == m.snapshotter {
+						m.snCursor = i
+						break
+					}
+				}
+				m.mode = modeSnapshotterSelect
+			}
 			return m, nil
 
 		case key.Matches(msg, keys.NextResource):
@@ -230,7 +282,7 @@ func (m model) View() string {
 
 	// Header bar: namespace indicator
 	headerText := " nerdtui "
-	nsText := styleHeaderNS.Render(fmt.Sprintf("[%s]", m.namespaces[m.activeNS]))
+	nsText := styleHeaderNS.Render(fmt.Sprintf("[ns:%s]", m.namespaces[m.activeNS]))
 	headerLeft := styleHeader.Render(headerText) + nsText
 	headerLeftWidth := lipgloss.Width(headerLeft)
 	headerPad := ""
@@ -266,11 +318,14 @@ func (m model) View() string {
 		helpBar = styleError.Render(errText + errPad)
 	}
 
-	content := lipgloss.JoinVertical(lipgloss.Left, header, tabBar, tableView, helpBar)
+	content := lipgloss.JoinVertical(lipgloss.Left, header, "", tabBar, tableView, helpBar)
 
-	// Overlay namespace selector
+	// Overlay selectors
 	if m.mode == modeNSSelect {
-		content = m.overlayNSSelector(content)
+		content = m.overlaySelector("Select Namespace", m.namespaces, m.nsCursor)
+	}
+	if m.mode == modeSnapshotterSelect {
+		content = m.overlaySelector("Select Snapshotter", m.snapshotters, m.snCursor)
 	}
 
 	// Overlay detail dialog
@@ -287,18 +342,18 @@ func (m model) View() string {
 	return content
 }
 
-func (m model) overlayNSSelector(bg string) string {
-	title := styleNSListTitle.Render(" Select Namespace ")
-	var items []string
-	for i, ns := range m.namespaces {
-		if i == m.nsCursor {
-			items = append(items, styleNSListSelected.Render("> "+ns))
+func (m model) overlaySelector(title string, items []string, cursor int) string {
+	titleLine := styleNSListTitle.Render(" " + title + " ")
+	var lines []string
+	for i, item := range items {
+		if i == cursor {
+			lines = append(lines, styleNSListSelected.Render("> "+item))
 		} else {
-			items = append(items, styleNSListItem.Render("  "+ns))
+			lines = append(lines, styleNSListItem.Render("  "+item))
 		}
 	}
-	list := strings.Join(items, "\n")
-	box := styleNSList.Render(lipgloss.JoinVertical(lipgloss.Left, title, list))
+	list := strings.Join(lines, "\n")
+	box := styleNSList.Render(lipgloss.JoinVertical(lipgloss.Left, titleLine, list))
 
 	return lipgloss.Place(
 		m.width, m.height,
@@ -306,6 +361,16 @@ func (m model) overlayNSSelector(bg string) string {
 		box,
 		lipgloss.WithWhitespaceChars(" "),
 	)
+}
+
+func loadSnapshotters(client *ctr.Client) tea.Cmd {
+	return func() tea.Msg {
+		sns, err := client.Snapshotters(context.Background())
+		if err != nil {
+			return errorMsg{err: err}
+		}
+		return snapshottersLoadedMsg{snapshotters: sns}
+	}
 }
 
 func loadNamespaces(client *ctr.Client) tea.Cmd {
@@ -318,7 +383,7 @@ func loadNamespaces(client *ctr.Client) tea.Cmd {
 	}
 }
 
-func loadResources(client *ctr.Client, ns string) tea.Cmd {
+func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		imgs, err := client.Images(ctx, ns)
@@ -333,11 +398,16 @@ func loadResources(client *ctr.Client, ns string) tea.Cmd {
 		if err != nil {
 			return errorMsg{err: err}
 		}
+		snaps, err := client.Snapshots(ctx, ns, snapshotter)
+		if err != nil {
+			snaps = nil
+		}
 		return resourcesLoadedMsg{
 			namespace:  ns,
 			images:     imgs,
 			containers: ctrs,
 			tasks:      tasks,
+			snapshots:  snaps,
 		}
 	}
 }
@@ -345,8 +415,9 @@ func loadResources(client *ctr.Client, ns string) tea.Cmd {
 type imagesRefreshedMsg []images.Image
 type containersRefreshedMsg []containers.Container
 type tasksRefreshedMsg []*tasktypes.Process
+type snapshotsRefreshedMsg []snapshots.Info
 
-func refreshResource(client *ctr.Client, ns, topic string) tea.Cmd {
+func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		switch {
@@ -368,6 +439,12 @@ func refreshResource(client *ctr.Client, ns, topic string) tea.Cmd {
 				return errorMsg{err: err}
 			}
 			return tasksRefreshedMsg(tasks)
+		case strings.HasPrefix(topic, "/snapshot/"):
+			snaps, err := client.Snapshots(ctx, ns, snapshotter)
+			if err != nil {
+				return errorMsg{err: err}
+			}
+			return snapshotsRefreshedMsg(snaps)
 		default:
 			return nil
 		}

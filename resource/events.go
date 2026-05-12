@@ -16,10 +16,10 @@ type Event struct {
 
 var EventKind = Kind{
 	Name: "Events",
-	Columns: []table.Column{
-		{Title: "Time", Width: 20},
-		{Title: "Namespace", Width: 14},
-		{Title: "Topic", Width: 30},
+	Columns: []Column{
+		{Title: "Time", MinWidth: 14},
+		{Title: "Namespace", MinWidth: 14},
+		{Title: "Topic", MinWidth: 20, Flex: true},
 	},
 	ToRows: func(data any) []table.Row {
 		evts, ok := data.([]Event)

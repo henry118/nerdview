@@ -3,14 +3,15 @@ package main
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Up           key.Binding
-	Down         key.Binding
-	NextResource key.Binding
-	PrevResource key.Binding
-	SelectNS     key.Binding
-	Enter        key.Binding
-	Escape       key.Binding
-	Quit         key.Binding
+	Up              key.Binding
+	Down            key.Binding
+	NextResource    key.Binding
+	PrevResource    key.Binding
+	SelectNS        key.Binding
+	SelectSnapshotter key.Binding
+	Enter           key.Binding
+	Escape          key.Binding
+	Quit            key.Binding
 }
 
 var keys = keyMap{
@@ -33,6 +34,10 @@ var keys = keyMap{
 	SelectNS: key.NewBinding(
 		key.WithKeys("n"),
 		key.WithHelp("n", "namespace"),
+	),
+	SelectSnapshotter: key.NewBinding(
+		key.WithKeys("s"),
+		key.WithHelp("s", "snapshotter"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),

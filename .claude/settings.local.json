@@ -19,7 +19,9 @@
       "Bash(go version *)",
       "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" make clean)",
       "Bash(make build *)",
-      "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go doc github.com/charmbracelet/bubbles/list)"
+      "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go doc github.com/charmbracelet/bubbles/list)",
+      "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go doc *)",
+      "Bash(GONOSUMCHECK=\"*\" GONOSUMDB=\"*\" go list github.com/containerd/containerd/...)"
     ]
   }
 }

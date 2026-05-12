@@ -10,10 +10,10 @@ import (
 
 var TaskKind = Kind{
 	Name: "Tasks",
-	Columns: []table.Column{
-		{Title: "Container ID", Width: 20},
-		{Title: "PID", Width: 8},
-		{Title: "Status", Width: 12},
+	Columns: []Column{
+		{Title: "Container ID", MinWidth: 12, Flex: true},
+		{Title: "PID", MinWidth: 8},
+		{Title: "Status", MinWidth: 12},
 	},
 	ToRows: func(data any) []table.Row {
 		procs, ok := data.([]*tasktypes.Process)

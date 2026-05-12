@@ -8,13 +8,14 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 )
 
+
 var ContainerKind = Kind{
 	Name: "Containers",
-	Columns: []table.Column{
-		{Title: "ID", Width: 20},
-		{Title: "Image", Width: 30},
-		{Title: "Runtime", Width: 16},
-		{Title: "Created", Width: 22},
+	Columns: []Column{
+		{Title: "ID", MinWidth: 12, Flex: true},
+		{Title: "Image", MinWidth: 20, Flex: true},
+		{Title: "Runtime", MinWidth: 16},
+		{Title: "Created", MinWidth: 20},
 	},
 	ToRows: func(data any) []table.Row {
 		ctrs, ok := data.([]containers.Container)

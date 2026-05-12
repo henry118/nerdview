@@ -10,10 +10,10 @@ import (
 
 var ImageKind = Kind{
 	Name: "Images",
-	Columns: []table.Column{
-		{Title: "Name", Width: 40},
-		{Title: "Digest", Width: 20},
-		{Title: "Created", Width: 22},
+	Columns: []Column{
+		{Title: "Name", MinWidth: 20, Flex: true},
+		{Title: "Digest", MinWidth: 20},
+		{Title: "Created", MinWidth: 20},
 	},
 	ToRows: func(data any) []table.Row {
 		imgs, ok := data.([]images.Image)
