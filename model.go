@@ -91,9 +91,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case namespacesLoadedMsg:
+		if len(msg.namespaces) == 0 {
+			return m, nil
+		}
+		currentNS := m.namespaces[m.activeNS]
 		m.namespaces = msg.namespaces
-		if len(m.namespaces) == 0 {
-			m.namespaces = []string{"default"}
+		m.activeNS = 0
+		for i, ns := range m.namespaces {
+			if ns == currentNS {
+				m.activeNS = i
+				break
+			}
 		}
 		return m, nil
 
