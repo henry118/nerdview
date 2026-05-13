@@ -142,16 +142,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, ctr.WaitForEvent(m.client))
 		if msg.Namespace == m.namespaces[m.activeNS] {
 			cmds = append(cmds, refreshResource(m.client, m.namespaces[m.activeNS], m.snapshotter, msg.Topic))
+			m.events = append([]resource.Event{{
+				Timestamp: msg.Timestamp,
+				Namespace: msg.Namespace,
+				Topic:     msg.Topic,
+			}}, m.events...)
+			if len(m.events) > maxEvents {
+				m.events = m.events[:maxEvents]
+			}
+			m.resources[4].UpdateData(m.events)
 		}
-		m.events = append([]resource.Event{{
-			Timestamp: msg.Timestamp,
-			Namespace: msg.Namespace,
-			Topic:     msg.Topic,
-		}}, m.events...)
-		if len(m.events) > maxEvents {
-			m.events = m.events[:maxEvents]
-		}
-		m.resources[4].UpdateData(m.events)
 		return m, tea.Batch(cmds...)
 
 	case ctr.EventErrMsg:
@@ -233,6 +233,8 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.activeNS = m.nsCursor
 			m.mode = modeNormal
+			m.events = nil
+			m.resources[4].UpdateData(m.events)
 			logging.Info("switched to namespace: %s", m.namespaces[m.activeNS])
 			return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
 		}
