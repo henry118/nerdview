@@ -70,10 +70,15 @@ func (t *Tab) SetWidth(width int) {
 }
 
 func (t *Tab) UpdateData(data any) {
-	firstLoad := t.RawData == nil
 	t.RawData = data
-	if firstLoad && t.Kind.InitFolded != nil {
-		t.Folded = t.Kind.InitFolded(data)
+	if t.Kind.InitFolded != nil {
+		// Merge: fold new nodes that aren't already tracked
+		defaults := t.Kind.InitFolded(data)
+		for k, v := range defaults {
+			if _, exists := t.Folded[k]; !exists {
+				t.Folded[k] = v
+			}
+		}
 	}
 	t.refreshRows()
 }
@@ -93,11 +98,7 @@ func (t *Tab) ToggleFold() {
 	if id == "" {
 		return
 	}
-	if t.Folded[id] {
-		delete(t.Folded, id)
-	} else {
-		t.Folded[id] = true
-	}
+	t.Folded[id] = !t.Folded[id]
 	t.refreshRows()
 }
 
