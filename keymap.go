@@ -25,12 +25,12 @@ var keys = keyMap{
 		key.WithHelp("↓/j", "down"),
 	),
 	NextResource: key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("Tab", "next resource"),
+		key.WithKeys("tab", "right"),
+		key.WithHelp("Tab/→", "next resource"),
 	),
 	PrevResource: key.NewBinding(
-		key.WithKeys("shift+tab"),
-		key.WithHelp("S-Tab", "prev resource"),
+		key.WithKeys("shift+tab", "left"),
+		key.WithHelp("S-Tab/←", "prev resource"),
 	),
 	SelectNS: key.NewBinding(
 		key.WithKeys("n"),
