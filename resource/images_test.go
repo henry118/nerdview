@@ -221,3 +221,85 @@ func TestDescLabel(t *testing.T) {
 		t.Errorf("descLabel no platform = %q, want %q", got, "config")
 	}
 }
+
+func TestTotalSize(t *testing.T) {
+	tree := ctr.ImageTree{
+		Desc: ocispec.Descriptor{Size: 1024},
+		Children: []ctr.ImageTree{
+			{
+				Desc: ocispec.Descriptor{Size: 512},
+				Children: []ctr.ImageTree{
+					{Desc: ocispec.Descriptor{Size: 2048}},
+					{Desc: ocispec.Descriptor{Size: 30 * 1024 * 1024}},
+				},
+			},
+			{Desc: ocispec.Descriptor{Size: 256}},
+		},
+	}
+
+	got := totalSize(tree)
+	// 1024 + 512 + 2048 + 30*1024*1024 + 256 = 31461888 + 3840 = 31461888 + 3840
+	want := int64(1024 + 512 + 2048 + 30*1024*1024 + 256)
+	if got != want {
+		t.Errorf("totalSize = %d, want %d", got, want)
+	}
+}
+
+func TestTotalSize_LeafNode(t *testing.T) {
+	leaf := ctr.ImageTree{
+		Desc: ocispec.Descriptor{Size: 4096},
+	}
+	got := totalSize(leaf)
+	if got != 4096 {
+		t.Errorf("totalSize leaf = %d, want 4096", got)
+	}
+}
+
+func TestImageKindToRows_SizeShowsTotal(t *testing.T) {
+	data := []ctr.ImageTree{
+		{
+			Name: "myimage:latest",
+			Desc: ocispec.Descriptor{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    digest.FromString("myimage"),
+				Size:      500,
+			},
+			Children: []ctr.ImageTree{
+				{
+					Desc: ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.config.v1+json",
+						Digest:    digest.FromString("config"),
+						Size:      1000,
+					},
+				},
+				{
+					Desc: ocispec.Descriptor{
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+						Digest:    digest.FromString("layer"),
+						Size:      10 * 1024 * 1024,
+					},
+				},
+			},
+		},
+	}
+
+	rows := ImageKind.ToRows(data, nil)
+
+	// Root row should show total size (500 + 1000 + 10M)
+	rootSize := rows[0][3]
+	if rootSize != "10.0M" {
+		t.Errorf("Root size = %q, want %q (total of children)", rootSize, "10.0M")
+	}
+
+	// Leaf layer row should show its own size
+	layerSize := rows[2][3]
+	if layerSize != "10.0M" {
+		t.Errorf("Layer size = %q, want %q", layerSize, "10.0M")
+	}
+
+	// Config row should show its own size
+	configSize := rows[1][3]
+	if configSize != "1000B" {
+		t.Errorf("Config size = %q, want %q", configSize, "1000B")
+	}
+}

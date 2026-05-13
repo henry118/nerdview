@@ -51,6 +51,32 @@ func TestKnownMediaTypes(t *testing.T) {
 	}
 }
 
+func TestIsManifestType(t *testing.T) {
+	manifests := []string{
+		"application/vnd.oci.image.index.v1+json",
+		"application/vnd.oci.image.manifest.v1+json",
+		"application/vnd.docker.distribution.manifest.v2+json",
+		"application/vnd.docker.distribution.manifest.list.v2+json",
+	}
+	for _, mt := range manifests {
+		if !isManifestType(mt) {
+			t.Errorf("expected %q to be a manifest type", mt)
+		}
+	}
+
+	nonManifests := []string{
+		"application/vnd.oci.image.config.v1+json",
+		"application/vnd.oci.image.layer.v1.tar+gzip",
+		"application/vnd.docker.image.rootfs.diff.tar.gzip",
+		"",
+	}
+	for _, mt := range nonManifests {
+		if isManifestType(mt) {
+			t.Errorf("expected %q to NOT be a manifest type", mt)
+		}
+	}
+}
+
 func TestIsKnownDescriptor(t *testing.T) {
 	tests := []struct {
 		name string

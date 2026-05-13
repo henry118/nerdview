@@ -165,11 +165,15 @@ func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]boo
 		}
 
 		digest := node.Desc.Digest.String()
+		size := node.Desc.Size
+		if len(node.Children) > 0 {
+			size = totalSize(node)
+		}
 		rows = append(rows, table.Row{
 			displayName,
 			shortMediaType(node.Desc.MediaType),
 			digest,
-			formatSize(node.Desc.Size),
+			formatSize(size),
 		})
 
 		if isFolded {
@@ -203,6 +207,14 @@ func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]boo
 	return rows
 }
 
+
+func totalSize(node ctr.ImageTree) int64 {
+	size := node.Desc.Size
+	for _, child := range node.Children {
+		size += totalSize(child)
+	}
+	return size
+}
 
 func descLabel(node ctr.ImageTree) string {
 	if node.Desc.Platform != nil {

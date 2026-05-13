@@ -182,6 +182,17 @@ func isKnownDescriptor(desc ocispec.Descriptor) bool {
 	return false
 }
 
+func isManifestType(mediaType string) bool {
+	switch mediaType {
+	case "application/vnd.oci.image.index.v1+json",
+		"application/vnd.oci.image.manifest.v1+json",
+		"application/vnd.docker.distribution.manifest.v2+json",
+		"application/vnd.docker.distribution.manifest.list.v2+json":
+		return true
+	}
+	return false
+}
+
 func walkContent(ctx context.Context, store content.Store, desc ocispec.Descriptor) []ImageTree {
 	children, err := images.Children(ctx, store, desc)
 	if err != nil {
@@ -195,6 +206,10 @@ func walkContent(ctx context.Context, store content.Store, desc ocispec.Descript
 		node := ImageTree{
 			Desc:     child,
 			Children: walkContent(ctx, store, child),
+		}
+		// Skip manifests that have no children (content not downloaded)
+		if isManifestType(child.MediaType) && len(node.Children) == 0 {
+			continue
 		}
 		result = append(result, node)
 	}
