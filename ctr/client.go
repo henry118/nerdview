@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package ctr wraps the containerd client SDK, providing methods to fetch
+// images, containers, tasks, snapshots, and namespaces scoped by namespace.
 package ctr
 
 import (
@@ -31,12 +33,15 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
+// Client wraps a containerd gRPC client with convenience methods for
+// fetching resources and subscribing to events.
 type Client struct {
 	inner   *containerd.Client
 	eventCh <-chan *events.Envelope
 	errCh   <-chan error
 }
 
+// New connects to the containerd daemon at the given socket address.
 func New(address string) (*Client, error) {
 	c, err := containerd.New(address)
 	if err != nil {
@@ -45,22 +50,27 @@ func New(address string) (*Client, error) {
 	return &Client{inner: c}, nil
 }
 
+// Close closes the underlying gRPC connection.
 func (c *Client) Close() error {
 	return c.inner.Close()
 }
 
+// StartEventStream subscribes to containerd events across all namespaces.
 func (c *Client) StartEventStream(ctx context.Context) {
 	c.eventCh, c.errCh = c.inner.Subscribe(ctx)
 }
 
+// EventCh returns the channel receiving containerd event envelopes.
 func (c *Client) EventCh() <-chan *events.Envelope {
 	return c.eventCh
 }
 
+// ErrCh returns the channel receiving event subscription errors.
 func (c *Client) ErrCh() <-chan error {
 	return c.errCh
 }
 
+// Namespaces returns all namespace names from containerd.
 func (c *Client) Namespaces(ctx context.Context) ([]string, error) {
 	ns, err := c.inner.NamespaceService().List(ctx)
 	if err != nil {
@@ -71,11 +81,13 @@ func (c *Client) Namespaces(ctx context.Context) ([]string, error) {
 	return ns, nil
 }
 
+// ContainerInfo pairs a container with its sandbox classification.
 type ContainerInfo struct {
 	Container containers.Container
 	IsSandbox bool
 }
 
+// Containers returns all containers in the namespace with sandbox detection.
 func (c *Client) Containers(ctx context.Context, ns string) ([]ContainerInfo, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	ctrs, err := c.inner.ContainerService().List(ctx)
@@ -107,6 +119,7 @@ func (c *Client) Containers(ctx context.Context, ns string) ([]ContainerInfo, er
 	return result, nil
 }
 
+// Snapshots walks the named snapshotter and returns all snapshot metadata.
 func (c *Client) Snapshots(ctx context.Context, ns string, snapshotter string) ([]snapshots.Info, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	sn := c.inner.SnapshotService(snapshotter)
@@ -123,12 +136,16 @@ func (c *Client) Snapshots(ctx context.Context, ns string, snapshotter string) (
 	return result, nil
 }
 
+// ImageTree represents an image and its content hierarchy (manifests, configs, layers).
 type ImageTree struct {
 	Name     string
 	Desc     ocispec.Descriptor
 	Children []ImageTree
 }
 
+// ImageTrees returns all images in the namespace as trees, walking the content
+// store to resolve manifests and layers. Unknown media types and unpulled
+// manifests are filtered out.
 func (c *Client) ImageTrees(ctx context.Context, ns string) ([]ImageTree, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	imgList, err := c.inner.ImageService().List(ctx)
@@ -216,12 +233,15 @@ func walkContent(ctx context.Context, store content.Store, desc ocispec.Descript
 	return result
 }
 
+// TaskInfo pairs a task process with its container's OCI runtime spec and bundle path.
 type TaskInfo struct {
 	Process    *tasktypes.Process
 	Spec       *specs.Spec
 	BundlePath string
 }
 
+// TasksWithSpec returns all tasks in the namespace, each enriched with the
+// container's OCI runtime spec and computed bundle path.
 func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	resp, err := c.inner.TaskService().List(ctx, &tasks.ListTasksRequest{})
@@ -255,6 +275,7 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 
 
 
+// Snapshotters returns the names of all available snapshotter plugins.
 func (c *Client) Snapshotters(ctx context.Context) ([]string, error) {
 	resp, err := c.inner.IntrospectionService().Plugins(ctx, "type==io.containerd.snapshotter.v1")
 	if err != nil {

@@ -40,6 +40,7 @@ var (
 				Align(lipgloss.Right)
 )
 
+// DialogModel is a scrollable overlay dialog for displaying resource details.
 type DialogModel struct {
 	Title    string
 	body     string
@@ -50,6 +51,7 @@ type DialogModel struct {
 	height   int
 }
 
+// NewDialog creates a dialog with initial terminal dimensions.
 func NewDialog(termW, termH int) DialogModel {
 	vp := viewport.New(30, 5)
 	return DialogModel{
@@ -59,6 +61,7 @@ func NewDialog(termW, termH int) DialogModel {
 	}
 }
 
+// SetContent sets the dialog title and body, auto-sizing to fit the content.
 func (d *DialogModel) SetContent(title, body string) {
 	d.Title = title
 	d.body = body
@@ -67,6 +70,7 @@ func (d *DialogModel) SetContent(title, body string) {
 	d.viewport.GotoTop()
 }
 
+// SetSize updates the terminal dimensions used for auto-sizing.
 func (d *DialogModel) SetSize(termW, termH int) {
 	d.termW = termW
 	d.termH = termH

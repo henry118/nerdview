@@ -22,15 +22,17 @@ import (
 	"time"
 )
 
+// DaemonStats holds resource usage metrics for the containerd daemon process.
 type DaemonStats struct {
 	PID     int
-	CPUPct  float64
-	VMS     uint64
-	RSS     uint64
-	Threads int
-	Uptime  time.Duration
+	CPUPct  float64       // Average CPU usage over process lifetime (like ps).
+	VMS     uint64        // Virtual memory size in bytes.
+	RSS     uint64        // Resident set size in bytes.
+	Threads int           // Number of threads.
+	Uptime  time.Duration // Time since process start.
 }
 
+// DaemonPID discovers the containerd daemon's PID from the pidfile or /proc.
 func (c *Client) DaemonPID() (int, error) {
 	// Try standard pidfile locations
 	for _, path := range []string{
@@ -69,6 +71,7 @@ func (c *Client) DaemonPID() (int, error) {
 	return 0, fmt.Errorf("containerd process not found")
 }
 
+// ReadDaemonStats reads CPU, memory, thread, and uptime info from /proc for the given PID.
 func ReadDaemonStats(pid int) (DaemonStats, error) {
 	stats := DaemonStats{PID: pid}
 
