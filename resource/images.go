@@ -164,7 +164,7 @@ func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]boo
 			displayName = e.prefix + connector + foldIcon + node.Name
 		}
 
-		digest := node.Desc.Digest.String()
+		digest := shortDigest(node.Desc.Digest.String())
 		size := node.Desc.Size
 		if len(node.Children) > 0 {
 			size = totalSize(node)
@@ -214,6 +214,17 @@ func totalSize(node ctr.ImageTree) int64 {
 		size += totalSize(child)
 	}
 	return size
+}
+
+func shortDigest(d string) string {
+	if idx := strings.Index(d, ":"); idx >= 0 {
+		hex := d[idx+1:]
+		if len(hex) > 12 {
+			hex = hex[:12]
+		}
+		return d[:idx+1] + hex
+	}
+	return d
 }
 
 func descLabel(node ctr.ImageTree) string {
