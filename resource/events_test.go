@@ -61,3 +61,46 @@ func TestEventKindToDetail(t *testing.T) {
 		t.Error("Body should contain topic")
 	}
 }
+
+func TestEventKindToDetail_WithPayload(t *testing.T) {
+	now := time.Date(2025, 1, 15, 10, 30, 45, 0, time.UTC)
+
+	type fakePayload struct {
+		Digest string `json:"digest"`
+		Size   int64  `json:"size"`
+	}
+
+	data := []Event{
+		{
+			Timestamp: now,
+			Namespace: "default",
+			Topic:     "/content/create",
+			Payload:   &fakePayload{Digest: "sha256:abc123", Size: 4096},
+		},
+	}
+
+	_, body := EventKind.ToDetail(data, nil, 0)
+
+	if !strings.Contains(body, "--- Payload ---") {
+		t.Error("Body should contain payload section")
+	}
+	if !strings.Contains(body, "sha256:abc123") {
+		t.Error("Body should contain digest from payload")
+	}
+	if !strings.Contains(body, "4096") {
+		t.Error("Body should contain size from payload")
+	}
+}
+
+func TestEventKindToDetail_NilPayload(t *testing.T) {
+	now := time.Date(2025, 1, 15, 10, 30, 45, 0, time.UTC)
+	data := []Event{
+		{Timestamp: now, Namespace: "default", Topic: "/images/create", Payload: nil},
+	}
+
+	_, body := EventKind.ToDetail(data, nil, 0)
+
+	if strings.Contains(body, "Payload") {
+		t.Error("Body should NOT contain payload section when payload is nil")
+	}
+}
