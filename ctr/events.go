@@ -19,7 +19,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	_ "github.com/containerd/containerd/api/events" // register protobuf event types
 	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/typeurl/v2"
 	"github.com/henry118/nerdtui/logging"
 )
 
@@ -28,6 +30,7 @@ type EventMsg struct {
 	Namespace string
 	Topic     string
 	Timestamp time.Time
+	Event     any // Decoded event payload (e.g. *apievents.ImageCreate, *apievents.TaskExit)
 }
 
 // EventErrMsg is sent when the event subscription encounters an error.
@@ -62,9 +65,16 @@ func WaitForEvent(c *Client) tea.Cmd {
 }
 
 func eventFromEnvelope(env *events.Envelope) EventMsg {
-	return EventMsg{
+	msg := EventMsg{
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
 		Timestamp: env.Timestamp,
 	}
+	if env.Event != nil {
+		decoded, err := typeurl.UnmarshalAny(env.Event)
+		if err == nil {
+			msg.Event = decoded
+		}
+	}
+	return msg
 }

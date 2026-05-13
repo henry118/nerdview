@@ -146,6 +146,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Timestamp: msg.Timestamp,
 				Namespace: msg.Namespace,
 				Topic:     msg.Topic,
+				Payload:   msg.Event,
 			}}, m.events...)
 			if len(m.events) > maxEvents {
 				m.events = m.events[:maxEvents]

@@ -15,6 +15,7 @@
 package resource
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ type Event struct {
 	Timestamp time.Time
 	Namespace string
 	Topic     string
+	Payload   any // Decoded event payload.
 }
 
 var EventKind = Kind{
@@ -61,6 +63,15 @@ var EventKind = Kind{
 		fmt.Fprintf(&b, "Timestamp:  %s\n", e.Timestamp.Format(time.RFC3339Nano))
 		fmt.Fprintf(&b, "Namespace:  %s\n", e.Namespace)
 		fmt.Fprintf(&b, "Topic:      %s\n", e.Topic)
+		if e.Payload != nil {
+			fmt.Fprintf(&b, "\n--- Payload ---\n")
+			data, err := json.MarshalIndent(e.Payload, "", "  ")
+			if err == nil {
+				fmt.Fprintf(&b, "%s\n", data)
+			} else {
+				fmt.Fprintf(&b, "%+v\n", e.Payload)
+			}
+		}
 		return e.Topic, b.String()
 	},
 }
