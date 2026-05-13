@@ -46,7 +46,7 @@ func write(level, format string, args ...any) {
 	}
 	ts := time.Now().UTC().Format("2006-01-02T15:04:05.000000000Z")
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(file, "%s level=%s msg=%s\n", ts, level, msg)
+	_, _ = fmt.Fprintf(file, "%s level=%s msg=%s\n", ts, level, msg)
 }
 
 func Info(format string, args ...any) {
