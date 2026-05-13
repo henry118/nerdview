@@ -36,15 +36,6 @@ var (
 				Foreground(lipgloss.Color("243")).
 				Padding(0, 1)
 
-	styleHelpBar = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245")).
-			Background(lipgloss.Color("236"))
-
-	styleHelpKey = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("115")).
-			Background(lipgloss.Color("236")).
-			Bold(true)
-
 	styleStatsLabel = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("245")).
 			Background(lipgloss.Color("236"))

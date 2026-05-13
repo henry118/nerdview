@@ -40,7 +40,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to connect to containerd: %v\n", err)
 		os.Exit(1)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	client.StartEventStream(context.Background())
 

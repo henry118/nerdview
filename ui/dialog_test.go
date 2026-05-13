@@ -21,9 +21,6 @@ import (
 
 func TestNewDialog(t *testing.T) {
 	d := NewDialog(80, 24)
-	if d.width != 0 && d.height != 0 {
-		// Before SetContent, dimensions are from viewport init
-	}
 	if d.Title != "" {
 		t.Error("New dialog should have empty title")
 	}
