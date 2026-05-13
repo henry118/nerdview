@@ -24,7 +24,7 @@ import (
 func TestHelpView_ContainsKeys(t *testing.T) {
 	view := HelpView(100)
 
-	keys := []string{"Tab", "←/→", "n", "s", "Space", "Enter", "Esc"}
+	keys := []string{"←/→", "Tab", "n", "s", "Enter", "Esc"}
 	for _, key := range keys {
 		if !strings.Contains(view, key) {
 			t.Errorf("HelpView should contain %q", key)

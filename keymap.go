@@ -39,12 +39,12 @@ var keys = keyMap{
 		key.WithHelp("↓/j", "down"),
 	),
 	NextResource: key.NewBinding(
-		key.WithKeys("tab", "right"),
-		key.WithHelp("Tab/→", "next resource"),
+		key.WithKeys("right"),
+		key.WithHelp("→", "next resource"),
 	),
 	PrevResource: key.NewBinding(
-		key.WithKeys("shift+tab", "left"),
-		key.WithHelp("S-Tab/←", "prev resource"),
+		key.WithKeys("left"),
+		key.WithHelp("←", "prev resource"),
 	),
 	SelectNS: key.NewBinding(
 		key.WithKeys("n"),
@@ -55,8 +55,8 @@ var keys = keyMap{
 		key.WithHelp("s", "snapshotter"),
 	),
 	ToggleFold: key.NewBinding(
-		key.WithKeys(" "),
-		key.WithHelp("Space", "fold/unfold"),
+		key.WithKeys("tab"),
+		key.WithHelp("Tab", "fold/unfold"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),

@@ -34,10 +34,10 @@ var (
 // HelpView renders the bottom help bar showing key bindings, padded to width.
 func HelpView(width int) string {
 	parts := []string{
-		helpKeyStyle.Render("Tab/←/→") + helpBarStyle.Render(":resource  "),
+		helpKeyStyle.Render("←/→") + helpBarStyle.Render(":resource  "),
+		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":fold/unfold  "),
 		helpKeyStyle.Render("n") + helpBarStyle.Render(":namespace  "),
 		helpKeyStyle.Render("s") + helpBarStyle.Render(":snapshotter  "),
-		helpKeyStyle.Render("Space") + helpBarStyle.Render(":fold/unfold  "),
 		helpKeyStyle.Render("Enter") + helpBarStyle.Render(":detail  "),
 		helpKeyStyle.Render("Esc") + helpBarStyle.Render(":quit"),
 	}
