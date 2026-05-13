@@ -23,16 +23,20 @@ import (
 	"github.com/henry118/nerdtui/logging"
 )
 
+// EventMsg is a Bubble Tea message carrying a single containerd event.
 type EventMsg struct {
 	Namespace string
 	Topic     string
 	Timestamp time.Time
 }
 
+// EventErrMsg is sent when the event subscription encounters an error.
 type EventErrMsg struct {
 	Err error
 }
 
+// WaitForEvent returns a Bubble Tea command that blocks until the next
+// containerd event arrives, then delivers it as an EventMsg.
 func WaitForEvent(c *Client) tea.Cmd {
 	return func() tea.Msg {
 		select {

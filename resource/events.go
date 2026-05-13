@@ -22,6 +22,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 )
 
+// Event represents a single containerd event for display in the Events tab.
 type Event struct {
 	Timestamp time.Time
 	Namespace string
