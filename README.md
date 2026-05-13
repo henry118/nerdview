@@ -27,7 +27,7 @@ cd nerdtui
 make build
 ```
 
-Requires Go 1.25+.
+Requires Go 1.26+.
 
 ## Usage
 
