@@ -165,7 +165,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case statsTickMsg:
 		return m, tea.Batch(
-			refreshDaemonStats(m.daemonPID),
+			refreshDaemonStats(m.client, m.daemonPID),
 			statsTickCmd(),
 		)
 
@@ -439,10 +439,10 @@ func formatBytes(b uint64) string {
 }
 
 func formatDuration(d time.Duration) string {
-	d = d.Round(time.Second)
-	days := int(d.Hours()) / 24
-	hours := int(d.Hours()) % 24
-	mins := int(d.Minutes()) % 60
+	totalMins := int(d.Minutes())
+	days := totalMins / 1440
+	hours := (totalMins % 1440) / 60
+	mins := totalMins % 60
 	if days > 0 {
 		return fmt.Sprintf("%dd%dh%dm", days, hours, mins)
 	}
@@ -566,10 +566,14 @@ func initDaemonStats(client *ctr.Client) tea.Cmd {
 	}
 }
 
-func refreshDaemonStats(pid int) tea.Cmd {
+func refreshDaemonStats(client *ctr.Client, pid int) tea.Cmd {
 	return func() tea.Msg {
 		if pid == 0 {
-			return nil
+			var err error
+			pid, err = client.DaemonPID()
+			if err != nil {
+				return nil
+			}
 		}
 		stats, err := ctr.ReadDaemonStats(pid)
 		if err != nil {

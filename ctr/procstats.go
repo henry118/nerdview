@@ -77,8 +77,6 @@ func ReadDaemonStats(pid int) (DaemonStats, error) {
 	if err != nil {
 		return stats, err
 	}
-	// Parse: fields after the comm (which may contain spaces/parens)
-	// Format: pid (comm) state ppid ... utime stime ...
 	s := string(statData)
 	closeParenIdx := strings.LastIndex(s, ")")
 	if closeParenIdx < 0 {
@@ -94,11 +92,9 @@ func ReadDaemonStats(pid int) (DaemonStats, error) {
 
 		stats.Threads = numThreads
 
-		// Calculate CPU percentage
-		clkTck := uint64(100) // sysconf(_SC_CLK_TCK), almost always 100
+		clkTck := uint64(100)
 		totalTicks := utime + stime
 
-		// Get system uptime
 		uptimeData, err := os.ReadFile("/proc/uptime")
 		if err == nil {
 			uptimeFields := strings.Fields(string(uptimeData))
