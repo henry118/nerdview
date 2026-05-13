@@ -91,17 +91,17 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 	if !strings.Contains(body, "Bundle:") {
 		t.Error("Should contain bundle path")
 	}
+	if !strings.Contains(body, "Runtime Spec") {
+		t.Error("Should contain runtime spec section")
+	}
 	if !strings.Contains(body, "/var/lib/containerd/rootfs") {
-		t.Error("Should contain rootfs path")
+		t.Error("Should contain rootfs path in JSON")
 	}
-	if !strings.Contains(body, "/bin/sh -c echo hello") {
-		t.Error("Should contain process args")
-	}
-	if !strings.Contains(body, "uid=1000 gid=1000") {
-		t.Error("Should contain user info")
+	if !strings.Contains(body, "echo hello") {
+		t.Error("Should contain process args in JSON")
 	}
 	if !strings.Contains(body, "my-host") {
-		t.Error("Should contain hostname")
+		t.Error("Should contain hostname in JSON")
 	}
 }
 
