@@ -21,8 +21,13 @@ type snapshottersLoadedMsg struct {
 	snapshotters []string
 }
 
+type daemonStatsMsg struct {
+	stats ctr.DaemonStats
+}
+
 type errorMsg struct {
 	err error
 }
 
 type tickMsg struct{}
+type statsTickMsg struct{}

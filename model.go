@@ -40,6 +40,8 @@ type model struct {
 	dialog       ui.DialogModel
 	mode         viewMode
 	nsCursor     int
+	daemonPID    int
+	daemonStats  ctr.DaemonStats
 	width        int
 	height       int
 	err          error
@@ -69,7 +71,9 @@ func (m model) Init() tea.Cmd {
 		loadSnapshotters(m.client),
 		loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter),
 		ctr.WaitForEvent(m.client),
+		initDaemonStats(m.client),
 		tickCmd(),
+		statsTickCmd(),
 	)
 }
 
@@ -138,6 +142,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ctr.EventErrMsg:
 		m.err = msg.Err
 		return m, nil
+
+	case daemonStatsMsg:
+		m.daemonStats = msg.stats
+		m.daemonPID = msg.stats.PID
+		return m, nil
+
+	case statsTickMsg:
+		return m, tea.Batch(
+			refreshDaemonStats(m.daemonPID),
+			statsTickCmd(),
+		)
 
 	case imagesRefreshedMsg:
 		m.resources[0].UpdateData([]ctr.ImageTree(msg))
@@ -292,16 +307,16 @@ func (m model) View() string {
 		return "Loading..."
 	}
 
-	// Header bar: namespace indicator
-	headerText := " nerdtui "
-	nsText := styleHeaderNS.Render(fmt.Sprintf("[ns:%s]", m.namespaces[m.activeNS]))
-	headerLeft := styleHeader.Render(headerText) + nsText
-	headerLeftWidth := lipgloss.Width(headerLeft)
+	// Header bar: app name, namespace, daemon stats
+	headerContent := styleHeader.Render(" nerdtui ") +
+		styleHeaderNS.Render(fmt.Sprintf("[ns:%s]", m.namespaces[m.activeNS])) +
+		m.renderDaemonStats()
+	headerWidth := lipgloss.Width(headerContent)
 	headerPad := ""
-	if m.width > headerLeftWidth {
-		headerPad = styleHeader.Render(strings.Repeat(" ", m.width-headerLeftWidth))
+	if m.width > headerWidth {
+		headerPad = styleHeader.Render(strings.Repeat(" ", m.width-headerWidth))
 	}
-	header := headerLeft + headerPad
+	header := headerContent + headerPad
 
 	// Tab bar: resource tabs
 	var tabs []string
@@ -373,6 +388,48 @@ func (m model) overlaySelector(title string, items []string, cursor int) string 
 		box,
 		lipgloss.WithWhitespaceChars(" "),
 	)
+}
+
+func (m model) renderDaemonStats() string {
+	s := m.daemonStats
+	if s.PID == 0 {
+		return ""
+	}
+	label := styleHeader.Render(" daemon ")
+	pid := styleStatsLabel.Render("pid:") + styleStatsPID.Render(fmt.Sprintf("%d", s.PID))
+	cpu := styleStatsLabel.Render(" cpu:") + styleStatsCPU.Render(fmt.Sprintf("%.1f%%", s.CPUPct))
+	vms := styleStatsLabel.Render(" vms:") + styleStatsVMS.Render(formatBytes(s.VMS))
+	rss := styleStatsLabel.Render(" rss:") + styleStatsRSS.Render(formatBytes(s.RSS))
+	threads := styleStatsLabel.Render(" threads:") + styleStatsThreads.Render(fmt.Sprintf("%d", s.Threads))
+	up := styleStatsLabel.Render(" up:") + styleStatsUptime.Render(formatDuration(s.Uptime))
+	return label + pid + cpu + vms + rss + threads + up
+}
+
+func formatBytes(b uint64) string {
+	switch {
+	case b >= 1<<30:
+		return fmt.Sprintf("%.1fG", float64(b)/float64(1<<30))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.1fM", float64(b)/float64(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.1fK", float64(b)/float64(1<<10))
+	default:
+		return fmt.Sprintf("%dB", b)
+	}
+}
+
+func formatDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	mins := int(d.Minutes()) % 60
+	if days > 0 {
+		return fmt.Sprintf("%dd%dh%dm", days, hours, mins)
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh%dm", hours, mins)
+	}
+	return fmt.Sprintf("%dm", mins)
 }
 
 func loadSnapshotters(client *ctr.Client) tea.Cmd {
@@ -467,4 +524,37 @@ func tickCmd() tea.Cmd {
 	return tea.Tick(30*time.Second, func(time.Time) tea.Msg {
 		return tickMsg{}
 	})
+}
+
+func statsTickCmd() tea.Cmd {
+	return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+		return statsTickMsg{}
+	})
+}
+
+func initDaemonStats(client *ctr.Client) tea.Cmd {
+	return func() tea.Msg {
+		pid, err := client.DaemonPID()
+		if err != nil {
+			return nil
+		}
+		stats, err := ctr.ReadDaemonStats(pid)
+		if err != nil {
+			return nil
+		}
+		return daemonStatsMsg{stats: stats}
+	}
+}
+
+func refreshDaemonStats(pid int) tea.Cmd {
+	return func() tea.Msg {
+		if pid == 0 {
+			return nil
+		}
+		stats, err := ctr.ReadDaemonStats(pid)
+		if err != nil {
+			return nil
+		}
+		return daemonStatsMsg{stats: stats}
+	}
 }

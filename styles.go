@@ -31,6 +31,36 @@ var (
 			Background(lipgloss.Color("236")).
 			Bold(true)
 
+	styleStatsLabel = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Background(lipgloss.Color("236"))
+
+	styleStatsPID = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("252")).
+			Background(lipgloss.Color("236"))
+
+	styleStatsCPU = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")).
+			Background(lipgloss.Color("236")).
+			Bold(true)
+
+	styleStatsVMS = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("177")).
+			Background(lipgloss.Color("236"))
+
+	styleStatsRSS = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("114")).
+			Background(lipgloss.Color("236")).
+			Bold(true)
+
+	styleStatsThreads = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("75")).
+				Background(lipgloss.Color("236"))
+
+	styleStatsUptime = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("223")).
+				Background(lipgloss.Color("236"))
+
 	styleError = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("203")).
 			Background(lipgloss.Color("236")).

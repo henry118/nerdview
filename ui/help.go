@@ -19,7 +19,7 @@ var (
 
 func HelpView(width int) string {
 	parts := []string{
-		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":resource  "),
+		helpKeyStyle.Render("Tab/←/→") + helpBarStyle.Render(":resource  "),
 		helpKeyStyle.Render("n") + helpBarStyle.Render(":namespace  "),
 		helpKeyStyle.Render("s") + helpBarStyle.Render(":snapshotter  "),
 		helpKeyStyle.Render("Space") + helpBarStyle.Render(":fold  "),
