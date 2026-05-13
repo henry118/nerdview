@@ -140,6 +140,9 @@ func (c *Client) ImageTrees(ctx context.Context, ns string) ([]ImageTree, error)
 	store := c.inner.ContentStore()
 	var trees []ImageTree
 	for _, img := range imgList {
+		if !isKnownDescriptor(img.Target) {
+			continue
+		}
 		tree := ImageTree{
 			Name: img.Name,
 			Desc: img.Target,
@@ -150,6 +153,35 @@ func (c *Client) ImageTrees(ctx context.Context, ns string) ([]ImageTree, error)
 	return trees, nil
 }
 
+var knownMediaTypes = map[string]bool{
+	"application/vnd.oci.image.index.v1+json":                  true,
+	"application/vnd.oci.image.manifest.v1+json":               true,
+	"application/vnd.oci.image.config.v1+json":                 true,
+	"application/vnd.oci.image.layer.v1.tar":                   true,
+	"application/vnd.oci.image.layer.v1.tar+gzip":              true,
+	"application/vnd.oci.image.layer.v1.tar+zstd":              true,
+	"application/vnd.oci.image.layer.nondistributable.v1.tar":  true,
+	"application/vnd.oci.image.layer.nondistributable.v1.tar+gzip": true,
+	"application/vnd.docker.distribution.manifest.v2+json":     true,
+	"application/vnd.docker.distribution.manifest.list.v2+json": true,
+	"application/vnd.docker.container.image.v1+json":           true,
+	"application/vnd.docker.image.rootfs.diff.tar.gzip":        true,
+}
+
+func isKnownDescriptor(desc ocispec.Descriptor) bool {
+	if desc.Platform != nil && desc.Platform.OS == "unknown" {
+		return false
+	}
+	if knownMediaTypes[desc.MediaType] {
+		return true
+	}
+	// OCI index entries may omit MediaType; accept if they have a valid platform
+	if desc.MediaType == "" && desc.Platform != nil {
+		return true
+	}
+	return false
+}
+
 func walkContent(ctx context.Context, store content.Store, desc ocispec.Descriptor) []ImageTree {
 	children, err := images.Children(ctx, store, desc)
 	if err != nil {
@@ -157,6 +189,9 @@ func walkContent(ctx context.Context, store content.Store, desc ocispec.Descript
 	}
 	var result []ImageTree
 	for _, child := range children {
+		if !isKnownDescriptor(child) {
+			continue
+		}
 		node := ImageTree{
 			Desc:     child,
 			Children: walkContent(ctx, store, child),
