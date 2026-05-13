@@ -50,9 +50,38 @@ func (c *Client) Namespaces(ctx context.Context) ([]string, error) {
 	return c.inner.NamespaceService().List(ctx)
 }
 
-func (c *Client) Containers(ctx context.Context, ns string) ([]containers.Container, error) {
+type ContainerInfo struct {
+	Container containers.Container
+	IsSandbox bool
+}
+
+func (c *Client) Containers(ctx context.Context, ns string) ([]ContainerInfo, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
-	return c.inner.ContainerService().List(ctx)
+	ctrs, err := c.inner.ContainerService().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get sandbox IDs from sandbox store
+	sandboxIDs := make(map[string]bool)
+	sandboxes, err := c.inner.SandboxStore().List(ctx)
+	if err == nil {
+		for _, sb := range sandboxes {
+			sandboxIDs[sb.ID] = true
+		}
+	}
+
+	var result []ContainerInfo
+	for _, ctr := range ctrs {
+		info := ContainerInfo{Container: ctr}
+		// A container is a sandbox if it's registered in the sandbox store,
+		// or if its SandboxID equals its own ID
+		if sandboxIDs[ctr.ID] || ctr.SandboxID == ctr.ID {
+			info.IsSandbox = true
+		}
+		result = append(result, info)
+	}
+	return result, nil
 }
 
 func (c *Client) Snapshots(ctx context.Context, ns string, snapshotter string) ([]snapshots.Info, error) {

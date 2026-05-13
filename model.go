@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/snapshots"
 
 	"github.com/henry118/nerdtui/ctr"
@@ -137,7 +136,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case containersRefreshedMsg:
-		m.resources[1].UpdateData([]containers.Container(msg))
+		m.resources[1].UpdateData([]ctr.ContainerInfo(msg))
 		return m, nil
 
 	case tasksRefreshedMsg:
@@ -418,7 +417,7 @@ func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 }
 
 type imagesRefreshedMsg []ctr.ImageTree
-type containersRefreshedMsg []containers.Container
+type containersRefreshedMsg []ctr.ContainerInfo
 type tasksRefreshedMsg []ctr.TaskInfo
 type snapshotsRefreshedMsg []snapshots.Info
 

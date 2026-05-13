@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/henry118/nerdtui/ctr"
 )
@@ -13,7 +12,7 @@ type namespacesLoadedMsg struct {
 type resourcesLoadedMsg struct {
 	namespace  string
 	images     []ctr.ImageTree
-	containers []containers.Container
+	containers []ctr.ContainerInfo
 	tasks      []ctr.TaskInfo
 	snapshots  []snapshots.Info
 }
