@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 
 	"github.com/henry118/nerdtui/ctr"
+	"github.com/henry118/nerdtui/logging"
 	"github.com/henry118/nerdtui/resource"
 	"github.com/henry118/nerdtui/ui"
 )
@@ -186,6 +187,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case errorMsg:
 		m.err = msg.err
+		logging.Error("ui error: %v", msg.err)
 		return m, nil
 
 	case tickMsg:
@@ -231,6 +233,7 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.activeNS = m.nsCursor
 			m.mode = modeNormal
+			logging.Info("switched to namespace: %s", m.namespaces[m.activeNS])
 			return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
 		}
 		return m, nil
@@ -253,6 +256,7 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.snapshotter = m.snapshotters[m.snCursor]
 			m.mode = modeNormal
+			logging.Info("switched to snapshotter: %s", m.snapshotter)
 			return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
 		}
 		return m, nil

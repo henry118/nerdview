@@ -20,6 +20,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/containerd/containerd/v2/core/events"
+	"github.com/henry118/nerdtui/logging"
 )
 
 type EventMsg struct {
@@ -37,14 +38,18 @@ func WaitForEvent(c *Client) tea.Cmd {
 		select {
 		case env, ok := <-c.EventCh():
 			if !ok {
+				logging.Error("event channel closed")
 				return EventErrMsg{Err: fmt.Errorf("event channel closed")}
 			}
+			logging.Debug("event received: ns=%s topic=%s", env.Namespace, env.Topic)
 			return eventFromEnvelope(env)
 		case err, ok := <-c.ErrCh():
 			if !ok {
+				logging.Error("error channel closed")
 				return EventErrMsg{Err: fmt.Errorf("error channel closed")}
 			}
 			if err != nil {
+				logging.Error("event stream error: %v", err)
 				return EventErrMsg{Err: err}
 			}
 			return nil

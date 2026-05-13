@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/henry118/nerdtui/logging"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -61,7 +62,13 @@ func (c *Client) ErrCh() <-chan error {
 }
 
 func (c *Client) Namespaces(ctx context.Context) ([]string, error) {
-	return c.inner.NamespaceService().List(ctx)
+	ns, err := c.inner.NamespaceService().List(ctx)
+	if err != nil {
+		logging.Error("failed to list namespaces: %v", err)
+		return nil, err
+	}
+	logging.Debug("loaded %d namespaces", len(ns))
+	return ns, nil
 }
 
 type ContainerInfo struct {
@@ -73,8 +80,10 @@ func (c *Client) Containers(ctx context.Context, ns string) ([]ContainerInfo, er
 	ctx = namespaces.WithNamespace(ctx, ns)
 	ctrs, err := c.inner.ContainerService().List(ctx)
 	if err != nil {
+		logging.Error("failed to list containers in ns=%s: %v", ns, err)
 		return nil, err
 	}
+	logging.Debug("loaded %d containers in ns=%s", len(ctrs), ns)
 
 	// Get sandbox IDs from sandbox store
 	sandboxIDs := make(map[string]bool)
@@ -107,8 +116,10 @@ func (c *Client) Snapshots(ctx context.Context, ns string, snapshotter string) (
 		return nil
 	})
 	if err != nil {
+		logging.Error("failed to list snapshots in ns=%s snapshotter=%s: %v", ns, snapshotter, err)
 		return nil, err
 	}
+	logging.Debug("loaded %d snapshots in ns=%s snapshotter=%s", len(result), ns, snapshotter)
 	return result, nil
 }
 
@@ -122,8 +133,10 @@ func (c *Client) ImageTrees(ctx context.Context, ns string) ([]ImageTree, error)
 	ctx = namespaces.WithNamespace(ctx, ns)
 	imgList, err := c.inner.ImageService().List(ctx)
 	if err != nil {
+		logging.Error("failed to list images in ns=%s: %v", ns, err)
 		return nil, err
 	}
+	logging.Debug("loaded %d images in ns=%s", len(imgList), ns)
 	store := c.inner.ContentStore()
 	var trees []ImageTree
 	for _, img := range imgList {
@@ -163,8 +176,10 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 	ctx = namespaces.WithNamespace(ctx, ns)
 	resp, err := c.inner.TaskService().List(ctx, &tasks.ListTasksRequest{})
 	if err != nil {
+		logging.Error("failed to list tasks in ns=%s: %v", ns, err)
 		return nil, err
 	}
+	logging.Debug("loaded %d tasks in ns=%s", len(resp.Tasks), ns)
 	actualNS := namespaces.Default
 	if n, ok := namespaces.Namespace(ctx); ok {
 		actualNS = n

@@ -23,31 +23,43 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/henry118/nerdtui/ctr"
+	"github.com/henry118/nerdtui/logging"
 )
 
 func main() {
 	namespace := flag.String("namespace", "default", "containerd namespace")
 	flag.StringVar(namespace, "n", "default", "containerd namespace (shorthand)")
+	debug := flag.Bool("debug", false, "enable debug logging to /var/log/nerdtui-<pid>.log")
 	flag.Parse()
+
+	if err := logging.Init(*debug); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: logging disabled: %v\n", err)
+	}
 
 	address := "/run/containerd/containerd.sock"
 	if env := os.Getenv("CONTAINERD_ADDRESS"); env != "" {
 		address = env
 	}
 
+	logging.Info("connecting to containerd at %s, namespace=%s", address, *namespace)
+
 	client, err := ctr.New(address)
 	if err != nil {
+		logging.Error("failed to connect to containerd: %v", err)
 		fmt.Fprintf(os.Stderr, "failed to connect to containerd: %v\n", err)
 		os.Exit(1)
 	}
 	defer func() { _ = client.Close() }()
 
 	client.StartEventStream(context.Background())
+	logging.Info("event stream started")
 
 	m := newModel(client, *namespace)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
+		logging.Error("program exited with error: %v", err)
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+	logging.Info("nerdtui exited normally")
 }
