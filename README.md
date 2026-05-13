@@ -1,5 +1,9 @@
 # nerdtui
 
+[![CI](https://github.com/henry118/nerdtui/actions/workflows/ci.yml/badge.svg)](https://github.com/henry118/nerdtui/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/henry118/nerdtui)](https://goreportcard.com/report/github.com/henry118/nerdtui)
+[![License](https://img.shields.io/github/license/henry118/nerdtui)](LICENSE)
+
 A terminal UI for [containerd](https://containerd.io/). Browse images, containers, tasks, snapshots, and events in real time.
 
 ![screenshot](doc/images/screenshot.png)

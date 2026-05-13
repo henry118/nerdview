@@ -1,0 +1,112 @@
+package resource
+
+import (
+	"testing"
+	"time"
+
+	"github.com/containerd/containerd/v2/core/snapshots"
+)
+
+func testSnapshots() []snapshots.Info {
+	now := time.Now()
+	return []snapshots.Info{
+		{Name: "layer1", Parent: "", Kind: snapshots.KindCommitted, Created: now},
+		{Name: "layer2", Parent: "layer1", Kind: snapshots.KindCommitted, Created: now},
+		{Name: "layer3", Parent: "layer2", Kind: snapshots.KindCommitted, Created: now},
+		{Name: "active1", Parent: "layer3", Kind: snapshots.KindActive, Created: now},
+		{Name: "rootB", Parent: "", Kind: snapshots.KindCommitted, Created: now},
+		{Name: "childB", Parent: "rootB", Kind: snapshots.KindActive, Created: now},
+	}
+}
+
+func TestSnapshotKindToRows_Unfolded(t *testing.T) {
+	data := testSnapshots()
+	rows := SnapshotKind.ToRows(data, nil)
+
+	// All 6 snapshots should be visible
+	if len(rows) != 6 {
+		t.Fatalf("Expected 6 rows, got %d", len(rows))
+	}
+
+	// First row should be root with fold icon
+	name := rows[0][0]
+	if name != "▾ layer1" {
+		t.Errorf("First row = %q, want %q", name, "▾ layer1")
+	}
+
+	// Second row should be child with connector
+	name = rows[1][0]
+	if name != "└─ layer2" {
+		t.Errorf("Second row = %q, want %q", name, "└─ layer2")
+	}
+}
+
+func TestSnapshotKindToRows_Folded(t *testing.T) {
+	data := testSnapshots()
+	folded := map[string]bool{"layer1": true, "rootB": true}
+
+	rows := SnapshotKind.ToRows(data, folded)
+
+	// Only root nodes visible: layer1 + rootB = 2
+	if len(rows) != 2 {
+		t.Fatalf("Expected 2 rows with all folded, got %d", len(rows))
+	}
+
+	if rows[0][0] != "▸ layer1" {
+		t.Errorf("Folded root = %q, want %q", rows[0][0], "▸ layer1")
+	}
+}
+
+func TestSnapshotKindInitFolded(t *testing.T) {
+	data := testSnapshots()
+	folded := SnapshotKind.InitFolded(data)
+
+	if !folded["layer1"] {
+		t.Error("layer1 (root with children) should be folded")
+	}
+	if !folded["rootB"] {
+		t.Error("rootB (root with children) should be folded")
+	}
+	if folded["layer2"] {
+		t.Error("layer2 (non-root) should NOT be folded")
+	}
+}
+
+func TestSnapshotKindRowID(t *testing.T) {
+	data := testSnapshots()
+	folded := map[string]bool{}
+
+	// Index 0 is layer1 (root with children)
+	id := SnapshotKind.RowID(data, folded, 0)
+	if id != "layer1" {
+		t.Errorf("RowID index 0 = %q, want %q", id, "layer1")
+	}
+
+	// Index 1 is layer2 (non-root, should not be foldable)
+	id = SnapshotKind.RowID(data, folded, 1)
+	if id != "" {
+		t.Errorf("RowID index 1 (non-root) = %q, want empty", id)
+	}
+}
+
+func TestStripTreePrefix(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"layer1", "layer1"},
+		{"▸ layer1", "layer1"},
+		{"▾ layer1", "layer1"},
+		{"├─ layer2", "layer2"},
+		{"└─ layer3", "layer3"},
+		{"│  └─ active1", "active1"},
+		{"├─ ▸ layer2", "layer2"},
+		{"   └─ ▾ deep", "deep"},
+	}
+	for _, tt := range tests {
+		got := stripTreePrefix(tt.input)
+		if got != tt.want {
+			t.Errorf("stripTreePrefix(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
