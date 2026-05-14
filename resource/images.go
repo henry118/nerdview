@@ -195,7 +195,7 @@ func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]boo
 			shortMediaType(node.Desc.MediaType),
 			digest,
 			layers,
-			formatSize(size),
+			FormatBytes(uint64(size)),
 		})
 
 		if isFolded {
@@ -293,16 +293,16 @@ func shortMediaType(mt string) string {
 	}
 }
 
-func formatSize(bytes int64) string {
+func FormatBytes(b uint64) string {
 	switch {
-	case bytes >= 1<<30:
-		return fmt.Sprintf("%.1fG", float64(bytes)/float64(1<<30))
-	case bytes >= 1<<20:
-		return fmt.Sprintf("%.1fM", float64(bytes)/float64(1<<20))
-	case bytes >= 1<<10:
-		return fmt.Sprintf("%.1fK", float64(bytes)/float64(1<<10))
+	case b >= 1<<30:
+		return fmt.Sprintf("%.1fG", float64(b)/float64(1<<30))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.1fM", float64(b)/float64(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.1fK", float64(b)/float64(1<<10))
 	default:
-		return fmt.Sprintf("%dB", bytes)
+		return fmt.Sprintf("%dB", b)
 	}
 }
 

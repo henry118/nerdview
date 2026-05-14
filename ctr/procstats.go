@@ -71,21 +71,27 @@ func (c *Client) DaemonPID() (int, error) {
 	return 0, fmt.Errorf("containerd process not found")
 }
 
-// ReadDaemonStats reads CPU, memory, thread, and uptime info from /proc for the given PID.
-func ReadDaemonStats(pid int) (DaemonStats, error) {
-	stats := DaemonStats{PID: pid}
-
-	// Read /proc/<pid>/stat for CPU and threads
+func procStatFields(pid int) ([]string, error) {
 	statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 	if err != nil {
-		return stats, err
+		return nil, err
 	}
 	s := string(statData)
 	closeParenIdx := strings.LastIndex(s, ")")
 	if closeParenIdx < 0 {
-		return stats, fmt.Errorf("invalid /proc/stat format")
+		return nil, fmt.Errorf("invalid /proc/stat format")
 	}
-	fields := strings.Fields(s[closeParenIdx+2:])
+	return strings.Fields(s[closeParenIdx+2:]), nil
+}
+
+// ReadDaemonStats reads CPU, memory, thread, and uptime info from /proc for the given PID.
+func ReadDaemonStats(pid int) (DaemonStats, error) {
+	stats := DaemonStats{PID: pid}
+
+	fields, err := procStatFields(pid)
+	if err != nil {
+		return stats, err
+	}
 	// fields[0]=state, [1]=ppid, ..., [11]=utime, [12]=stime, ..., [17]=num_threads, ..., [19]=starttime
 	if len(fields) > 19 {
 		utime, _ := strconv.ParseUint(fields[11], 10, 64)
@@ -138,28 +144,25 @@ func parseKBValue(line string) uint64 {
 	return 0
 }
 
-// ProcessRoot returns the root filesystem path for the given PID.
-func ProcessRoot(pid uint32) string {
+func procReadlink(pid uint32, name string) string {
 	if pid == 0 {
 		return ""
 	}
-	target, err := os.Readlink(fmt.Sprintf("/proc/%d/root", pid))
+	target, err := os.Readlink(fmt.Sprintf("/proc/%d/%s", pid, name))
 	if err != nil {
 		return ""
 	}
 	return target
 }
 
+// ProcessRoot returns the root filesystem path for the given PID.
+func ProcessRoot(pid uint32) string {
+	return procReadlink(pid, "root")
+}
+
 // ProcessCwd returns the working directory for the given PID.
 func ProcessCwd(pid uint32) string {
-	if pid == 0 {
-		return ""
-	}
-	target, err := os.Readlink(fmt.Sprintf("/proc/%d/cwd", pid))
-	if err != nil {
-		return ""
-	}
-	return target
+	return procReadlink(pid, "cwd")
 }
 
 // ProcessCgroup returns the cgroup paths for the given PID.
@@ -227,16 +230,10 @@ func ProcessStartTime(pid uint32) string {
 	if pid == 0 {
 		return ""
 	}
-	statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	fields, err := procStatFields(int(pid))
 	if err != nil {
 		return ""
 	}
-	s := string(statData)
-	closeParenIdx := strings.LastIndex(s, ")")
-	if closeParenIdx < 0 {
-		return ""
-	}
-	fields := strings.Fields(s[closeParenIdx+2:])
 	if len(fields) <= 19 {
 		return ""
 	}

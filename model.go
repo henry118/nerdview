@@ -220,176 +220,189 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.mode {
 	case modeDialog:
-		switch {
-		case key.Matches(msg, keys.Escape):
-			m.mode = modeNormal
-			return m, nil
-		default:
-			var cmd tea.Cmd
-			m.dialog, cmd = m.dialog.Update(msg)
-			return m, cmd
-		}
-
+		return m.handleDialogKey(msg)
 	case modeNSSelect:
-		switch {
-		case key.Matches(msg, keys.Escape):
-			m.mode = modeNormal
-			return m, nil
-		case key.Matches(msg, keys.Up):
-			if m.nsCursor > 0 {
-				m.nsCursor--
-			}
-			return m, nil
-		case key.Matches(msg, keys.Down):
-			if m.nsCursor < len(m.namespaces)-1 {
-				m.nsCursor++
-			}
-			return m, nil
-		case key.Matches(msg, keys.Enter):
-			m.activeNS = m.nsCursor
-			m.mode = modeNormal
-			m.events = nil
-			m.resources[tabEvents].UpdateData(m.events)
-			logging.Info("switched to namespace: %s", m.namespaces[m.activeNS])
-			return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
-		}
-		return m, nil
-
+		return m.handleNSSelectKey(msg)
 	case modeSnapshotterSelect:
-		switch {
-		case key.Matches(msg, keys.Escape):
-			m.mode = modeNormal
-			return m, nil
-		case key.Matches(msg, keys.Up):
-			if m.snCursor > 0 {
-				m.snCursor--
+		return m.handleSnapshotterSelectKey(msg)
+	default:
+		return m.handleNormalKey(msg)
+	}
+}
+
+func (m model) handleDialogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keys.Escape):
+		m.mode = modeNormal
+		return m, nil
+	default:
+		var cmd tea.Cmd
+		m.dialog, cmd = m.dialog.Update(msg)
+		return m, cmd
+	}
+}
+
+func (m model) handleNSSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keys.Escape):
+		m.mode = modeNormal
+		return m, nil
+	case key.Matches(msg, keys.Up):
+		if m.nsCursor > 0 {
+			m.nsCursor--
+		}
+		return m, nil
+	case key.Matches(msg, keys.Down):
+		if m.nsCursor < len(m.namespaces)-1 {
+			m.nsCursor++
+		}
+		return m, nil
+	case key.Matches(msg, keys.Enter):
+		m.activeNS = m.nsCursor
+		m.mode = modeNormal
+		m.events = nil
+		m.resources[tabEvents].UpdateData(m.events)
+		logging.Info("switched to namespace: %s", m.namespaces[m.activeNS])
+		return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
+	}
+	return m, nil
+}
+
+func (m model) handleSnapshotterSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keys.Escape):
+		m.mode = modeNormal
+		return m, nil
+	case key.Matches(msg, keys.Up):
+		if m.snCursor > 0 {
+			m.snCursor--
+		}
+		return m, nil
+	case key.Matches(msg, keys.Down):
+		if m.snCursor < len(m.snapshotters)-1 {
+			m.snCursor++
+		}
+		return m, nil
+	case key.Matches(msg, keys.Enter):
+		m.snapshotter = m.snapshotters[m.snCursor]
+		m.mode = modeNormal
+		logging.Info("switched to snapshotter: %s", m.snapshotter)
+		return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
+	}
+	return m, nil
+}
+
+func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keys.Quit), key.Matches(msg, keys.Escape):
+		return m, tea.Quit
+
+	case key.Matches(msg, keys.SelectNS):
+		m.nsCursor = m.activeNS
+		m.mode = modeNSSelect
+		return m, nil
+
+	case key.Matches(msg, keys.SelectSnapshotter):
+		if len(m.snapshotters) > 0 {
+			m.snCursor = 0
+			for i, s := range m.snapshotters {
+				if s == m.snapshotter {
+					m.snCursor = i
+					break
+				}
 			}
-			return m, nil
-		case key.Matches(msg, keys.Down):
-			if m.snCursor < len(m.snapshotters)-1 {
-				m.snCursor++
-			}
-			return m, nil
-		case key.Matches(msg, keys.Enter):
-			m.snapshotter = m.snapshotters[m.snCursor]
-			m.mode = modeNormal
-			logging.Info("switched to snapshotter: %s", m.snapshotter)
-			return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
+			m.mode = modeSnapshotterSelect
 		}
 		return m, nil
 
-	default:
-		switch {
-		case key.Matches(msg, keys.Quit), key.Matches(msg, keys.Escape):
-			return m, tea.Quit
+	case key.Matches(msg, keys.NextResource):
+		m.resources[m.activeRes].Table.Blur()
+		m.activeRes = (m.activeRes + 1) % len(m.resources)
+		m.resources[m.activeRes].Table.Focus()
+		return m, nil
 
-		case key.Matches(msg, keys.SelectNS):
-			m.nsCursor = m.activeNS
-			m.mode = modeNSSelect
-			return m, nil
+	case key.Matches(msg, keys.PrevResource):
+		m.resources[m.activeRes].Table.Blur()
+		m.activeRes = (m.activeRes - 1 + len(m.resources)) % len(m.resources)
+		m.resources[m.activeRes].Table.Focus()
+		return m, nil
 
-		case key.Matches(msg, keys.SelectSnapshotter):
-			if len(m.snapshotters) > 0 {
-				m.snCursor = 0
-				for i, s := range m.snapshotters {
-					if s == m.snapshotter {
-						m.snCursor = i
-						break
-					}
-				}
-				m.mode = modeSnapshotterSelect
-			}
-			return m, nil
+	case key.Matches(msg, keys.ToggleFold):
+		tab := m.resources[m.activeRes]
+		if tab.CanFold() {
+			tab.ToggleFold()
+		}
+		return m, nil
 
-		case key.Matches(msg, keys.NextResource):
+	case key.Matches(msg, keys.GoTo):
+		tab := m.resources[m.activeRes]
+		idx := tab.Table.Cursor()
+		var targetTab int
+		var targetKey string
+		switch m.activeRes {
+		case tabImages:
+			targetTab = tabSnapshots
+			targetKey = resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
+		case tabContainers:
+			targetTab = tabSnapshots
+			targetKey = resource.ContainerSnapshotRef(tab.RawData, tab.Folded, idx)
+		case tabTasks:
+			targetTab = tabContainers
+			targetKey = resource.TaskContainerRef(tab.RawData, tab.Folded, idx)
+		}
+		if targetKey != "" {
+			m.navHistory = append(m.navHistory, navState{
+				tabIndex: m.activeRes,
+				cursor:   idx,
+			})
 			m.resources[m.activeRes].Table.Blur()
-			m.activeRes = (m.activeRes + 1) % len(m.resources)
+			m.activeRes = targetTab
 			m.resources[m.activeRes].Table.Focus()
-			return m, nil
+			rows := m.resources[m.activeRes].Table.Rows()
+			for i, row := range rows {
+				if len(row) > 0 && strings.Contains(row[0], targetKey) {
+					m.resources[m.activeRes].Table.SetCursor(i)
+					break
+				}
+			}
+		}
+		return m, nil
 
-		case key.Matches(msg, keys.PrevResource):
+	case key.Matches(msg, keys.GoBack):
+		if len(m.navHistory) > 0 {
+			prev := m.navHistory[len(m.navHistory)-1]
+			m.navHistory = m.navHistory[:len(m.navHistory)-1]
 			m.resources[m.activeRes].Table.Blur()
-			m.activeRes = (m.activeRes - 1 + len(m.resources)) % len(m.resources)
+			m.activeRes = prev.tabIndex
 			m.resources[m.activeRes].Table.Focus()
-			return m, nil
+			m.resources[m.activeRes].Table.SetCursor(prev.cursor)
+		}
+		return m, nil
 
-		case key.Matches(msg, keys.ToggleFold):
-			tab := m.resources[m.activeRes]
-			if tab.CanFold() {
-				tab.ToggleFold()
-			}
-			return m, nil
-
-		case key.Matches(msg, keys.GoTo):
-			tab := m.resources[m.activeRes]
-			idx := tab.Table.Cursor()
-			var targetTab int
-			var targetKey string
-			switch m.activeRes {
-			case tabImages:
-				targetTab = tabSnapshots
-				targetKey = resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
-			case tabContainers:
-				targetTab = tabSnapshots
-				targetKey = resource.ContainerSnapshotRef(tab.RawData, tab.Folded, idx)
-			case tabTasks:
-				targetTab = tabContainers
-				targetKey = resource.TaskContainerRef(tab.RawData, tab.Folded, idx)
-			}
-			if targetKey != "" {
-				m.navHistory = append(m.navHistory, navState{
-					tabIndex: m.activeRes,
-					cursor:   idx,
-				})
-				m.resources[m.activeRes].Table.Blur()
-				m.activeRes = targetTab
-				m.resources[m.activeRes].Table.Focus()
-				rows := m.resources[m.activeRes].Table.Rows()
-				for i, row := range rows {
-					if len(row) > 0 && strings.Contains(row[0], targetKey) {
-						m.resources[m.activeRes].Table.SetCursor(i)
-						break
-					}
-				}
-			}
-			return m, nil
-
-		case key.Matches(msg, keys.GoBack):
-			if len(m.navHistory) > 0 {
-				prev := m.navHistory[len(m.navHistory)-1]
-				m.navHistory = m.navHistory[:len(m.navHistory)-1]
-				m.resources[m.activeRes].Table.Blur()
-				m.activeRes = prev.tabIndex
-				m.resources[m.activeRes].Table.Focus()
-				m.resources[m.activeRes].Table.SetCursor(prev.cursor)
-			}
-			return m, nil
-
-		case key.Matches(msg, keys.Spec):
-			if m.activeRes == tabContainers {
-				tab := m.resources[tabContainers]
-				title, body := resource.ContainerSpec(tab.RawData, tab.Folded, tab.Table.Cursor())
-				if title != "" {
-					m.dialog.SetContent(title, body)
-					m.mode = modeDialog
-				}
-			}
-			return m, nil
-
-		case key.Matches(msg, keys.Enter):
-			tab := m.resources[m.activeRes]
-			title, body := tab.SelectedDetail()
+	case key.Matches(msg, keys.Spec):
+		if m.activeRes == tabContainers {
+			tab := m.resources[tabContainers]
+			title, body := resource.ContainerSpec(tab.RawData, tab.Folded, tab.Table.Cursor())
 			if title != "" {
 				m.dialog.SetContent(title, body)
 				m.mode = modeDialog
 			}
-			return m, nil
-
-		default:
-			var cmd tea.Cmd
-			m.resources[m.activeRes].Table, cmd = m.resources[m.activeRes].Table.Update(msg)
-			return m, cmd
 		}
+		return m, nil
+
+	case key.Matches(msg, keys.Enter):
+		tab := m.resources[m.activeRes]
+		title, body := tab.SelectedDetail()
+		if title != "" {
+			m.dialog.SetContent(title, body)
+			m.mode = modeDialog
+		}
+		return m, nil
+
+	default:
+		var cmd tea.Cmd
+		m.resources[m.activeRes].Table, cmd = m.resources[m.activeRes].Table.Update(msg)
+		return m, cmd
 	}
 }
 
@@ -518,25 +531,13 @@ func (m model) renderStatsBar() string {
 	}
 	pid := styleStatsLabel.Render("  pid:") + styleStatsPID.Render(fmt.Sprintf("%d", s.PID))
 	cpu := styleStatsLabel.Render(" cpu:") + styleStatsCPU.Render(fmt.Sprintf("%.1f%%", s.CPUPct))
-	vms := styleStatsLabel.Render(" vms:") + styleStatsVMS.Render(formatBytes(s.VMS))
-	rss := styleStatsLabel.Render(" rss:") + styleStatsRSS.Render(formatBytes(s.RSS))
+	vms := styleStatsLabel.Render(" vms:") + styleStatsVMS.Render(resource.FormatBytes(s.VMS))
+	rss := styleStatsLabel.Render(" rss:") + styleStatsRSS.Render(resource.FormatBytes(s.RSS))
 	threads := styleStatsLabel.Render(" threads:") + styleStatsThreads.Render(fmt.Sprintf("%d", s.Threads))
 	up := styleStatsLabel.Render(" up:") + styleStatsUptime.Render(formatDuration(s.Uptime))
 	return ns + pid + cpu + vms + rss + threads + up
 }
 
-func formatBytes(b uint64) string {
-	switch {
-	case b >= 1<<30:
-		return fmt.Sprintf("%.1fG", float64(b)/float64(1<<30))
-	case b >= 1<<20:
-		return fmt.Sprintf("%.1fM", float64(b)/float64(1<<20))
-	case b >= 1<<10:
-		return fmt.Sprintf("%.1fK", float64(b)/float64(1<<10))
-	default:
-		return fmt.Sprintf("%dB", b)
-	}
-}
 
 func formatDuration(d time.Duration) string {
 	totalMins := int(d.Minutes())
