@@ -103,35 +103,33 @@ func TestSnapshotKindRowID(t *testing.T) {
 	}
 }
 
-func TestSnapshotNameAtIndex(t *testing.T) {
+func TestSnapshotNodeAtIndex(t *testing.T) {
 	infos := testSnapshots()
 	folded := map[string]bool{}
 
+	result := BuildTree(snapshotTreeSpec, infos, folded)
+
 	// Unfolded order: layer1, layer2, layer3, active1, rootB, childB
-	if got := snapshotNameAtIndex(infos, folded, 0); got != "layer1" {
-		t.Errorf("index 0 = %q, want %q", got, "layer1")
+	if result.Nodes[0].ID != "layer1" {
+		t.Errorf("index 0 = %q, want %q", result.Nodes[0].ID, "layer1")
 	}
-	if got := snapshotNameAtIndex(infos, folded, 1); got != "layer2" {
-		t.Errorf("index 1 = %q, want %q", got, "layer2")
+	if result.Nodes[1].ID != "layer2" {
+		t.Errorf("index 1 = %q, want %q", result.Nodes[1].ID, "layer2")
 	}
-	if got := snapshotNameAtIndex(infos, folded, 3); got != "active1" {
-		t.Errorf("index 3 = %q, want %q", got, "active1")
+	if result.Nodes[3].ID != "active1" {
+		t.Errorf("index 3 = %q, want %q", result.Nodes[3].ID, "active1")
 	}
-	if got := snapshotNameAtIndex(infos, folded, 4); got != "rootB" {
-		t.Errorf("index 4 = %q, want %q", got, "rootB")
+	if result.Nodes[4].ID != "rootB" {
+		t.Errorf("index 4 = %q, want %q", result.Nodes[4].ID, "rootB")
 	}
 
 	// Folded: layer1 folded hides its children
 	foldedMap := map[string]bool{"layer1": true}
-	if got := snapshotNameAtIndex(infos, foldedMap, 0); got != "layer1" {
-		t.Errorf("folded index 0 = %q, want %q", got, "layer1")
+	foldedResult := BuildTree(snapshotTreeSpec, infos, foldedMap)
+	if foldedResult.Nodes[0].ID != "layer1" {
+		t.Errorf("folded index 0 = %q, want %q", foldedResult.Nodes[0].ID, "layer1")
 	}
-	if got := snapshotNameAtIndex(infos, foldedMap, 1); got != "rootB" {
-		t.Errorf("folded index 1 = %q, want %q", got, "rootB")
-	}
-
-	// Out of bounds
-	if got := snapshotNameAtIndex(infos, folded, 99); got != "" {
-		t.Errorf("index 99 = %q, want empty", got)
+	if foldedResult.Nodes[1].ID != "rootB" {
+		t.Errorf("folded index 1 = %q, want %q", foldedResult.Nodes[1].ID, "rootB")
 	}
 }

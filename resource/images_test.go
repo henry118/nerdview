@@ -173,9 +173,9 @@ func TestShortMediaType(t *testing.T) {
 	}
 }
 
-func TestFormatSize(t *testing.T) {
+func TestFormatBytes(t *testing.T) {
 	tests := []struct {
-		input int64
+		input uint64
 		want  string
 	}{
 		{0, "0B"},
@@ -186,9 +186,9 @@ func TestFormatSize(t *testing.T) {
 		{1073741824, "1.0G"},
 	}
 	for _, tt := range tests {
-		got := formatSize(tt.input)
+		got := FormatBytes(tt.input)
 		if got != tt.want {
-			t.Errorf("formatSize(%d) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("FormatBytes(%d) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }

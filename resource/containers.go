@@ -17,12 +17,40 @@ package resource
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/henry118/nerdview/ctr"
 )
+
+var containerTreeSpec = TreeSpec[ctr.ContainerInfo]{
+	ID: func(info ctr.ContainerInfo) string { return info.Container.ID },
+	ParentID: func(info ctr.ContainerInfo) string {
+		c := info.Container
+		if !info.IsSandbox && c.SandboxID != "" && c.SandboxID != c.ID {
+			return c.SandboxID
+		}
+		return ""
+	},
+	Foldable: func(info ctr.ContainerInfo, hasChildren bool) bool {
+		return info.IsSandbox && hasChildren
+	},
+	Sort: func(a, b ctr.ContainerInfo) bool { return a.Container.ID < b.Container.ID },
+	ToRow: func(info ctr.ContainerInfo, _ bool) table.Row {
+		c := info.Container
+		typ := "container"
+		if info.IsSandbox {
+			typ = "sandbox"
+		}
+		return table.Row{
+			c.ID,
+			typ,
+			c.Image,
+			c.Runtime.Name,
+			c.CreatedAt.Format("2006-01-02 15:04:05"),
+		}
+	},
+}
 
 var ContainerKind = Kind{
 	Name: "Containers",
@@ -38,22 +66,20 @@ var ContainerKind = Kind{
 		if !ok || len(infos) == 0 {
 			return nil
 		}
-		return buildContainerTree(infos, folded)
+		return BuildTree(containerTreeSpec, infos, folded).Rows
 	},
 	RowID: func(data any, folded map[string]bool, index int) string {
 		infos, ok := data.([]ctr.ContainerInfo)
 		if !ok || index < 0 {
 			return ""
 		}
-		rows := buildContainerTree(infos, folded)
-		if index >= len(rows) {
+		result := BuildTree(containerTreeSpec, infos, folded)
+		if index >= len(result.Nodes) {
 			return ""
 		}
-		id := stripContainerPrefix(rows[index][0])
-		// Only sandboxes with children are foldable
-		children := buildSandboxChildren(infos)
-		if len(children[id]) > 0 {
-			return id
+		node := result.Nodes[index]
+		if node.HasChildren && node.Item.IsSandbox {
+			return node.ID
 		}
 		return ""
 	},
@@ -62,136 +88,23 @@ var ContainerKind = Kind{
 		if !ok || index < 0 {
 			return "", ""
 		}
-		rows := buildContainerTree(infos, folded)
-		if index >= len(rows) {
+		result := BuildTree(containerTreeSpec, infos, folded)
+		if index >= len(result.Nodes) {
 			return "", ""
 		}
-		id := stripContainerPrefix(rows[index][0])
-		for _, info := range infos {
-			if info.Container.ID == id {
-				return formatContainerDetail(info)
-			}
-		}
-		return "", ""
+		return formatContainerDetail(result.Nodes[index].Item)
 	},
-}
-
-func buildSandboxChildren(infos []ctr.ContainerInfo) map[string][]string {
-	children := make(map[string][]string)
-	for _, info := range infos {
-		c := info.Container
-		// A non-sandbox container that has a SandboxID is a child of that sandbox
-		if !info.IsSandbox && c.SandboxID != "" && c.SandboxID != c.ID {
-			children[c.SandboxID] = append(children[c.SandboxID], c.ID)
+	GoToRef: func(data any, folded map[string]bool, index int) string {
+		infos, ok := data.([]ctr.ContainerInfo)
+		if !ok || index < 0 {
+			return ""
 		}
-	}
-	for k := range children {
-		sort.Strings(children[k])
-	}
-	return children
-}
-
-func buildContainerTree(infos []ctr.ContainerInfo, folded map[string]bool) []table.Row {
-	byID := make(map[string]ctr.ContainerInfo, len(infos))
-	for _, info := range infos {
-		byID[info.Container.ID] = info
-	}
-
-	sandboxChildren := buildSandboxChildren(infos)
-
-	// Categorize
-	var sandboxIDs []string
-	var standalone []string
-	for _, info := range infos {
-		c := info.Container
-		if info.IsSandbox {
-			sandboxIDs = append(sandboxIDs, c.ID)
-		} else if c.SandboxID == "" || c.SandboxID == c.ID {
-			standalone = append(standalone, c.ID)
+		result := BuildTree(containerTreeSpec, infos, folded)
+		if index >= len(result.Nodes) {
+			return ""
 		}
-		// containers with SandboxID pointing elsewhere are children, rendered under their sandbox
-	}
-	sort.Strings(sandboxIDs)
-	sort.Strings(standalone)
-
-	var rows []table.Row
-
-	// Render sandboxes with their children
-	for _, id := range sandboxIDs {
-		info := byID[id]
-		c := info.Container
-		hasChildren := len(sandboxChildren[id]) > 0
-		isFolded := hasChildren && folded[id]
-
-		foldIcon := ""
-		if hasChildren {
-			if isFolded {
-				foldIcon = IconFolded
-			} else {
-				foldIcon = IconUnfolded
-			}
-		}
-
-		rows = append(rows, table.Row{
-			foldIcon + c.ID,
-			"sandbox",
-			c.Image,
-			c.Runtime.Name,
-			c.CreatedAt.Format("2006-01-02 15:04:05"),
-		})
-
-		if isFolded {
-			continue
-		}
-
-		kids := sandboxChildren[id]
-		for i, childID := range kids {
-			child := byID[childID]
-			connector := ConnMid
-			if i == len(kids)-1 {
-				connector = ConnLast
-			}
-			rows = append(rows, table.Row{
-				connector + child.Container.ID,
-				"container",
-				child.Container.Image,
-				child.Container.Runtime.Name,
-				child.Container.CreatedAt.Format("2006-01-02 15:04:05"),
-			})
-		}
-	}
-
-	// Render standalone containers
-	for _, id := range standalone {
-		info := byID[id]
-		c := info.Container
-		rows = append(rows, table.Row{
-			c.ID,
-			"container",
-			c.Image,
-			c.Runtime.Name,
-			c.CreatedAt.Format("2006-01-02 15:04:05"),
-		})
-	}
-
-	return rows
-}
-
-func stripContainerPrefix(s string) string {
-	prefixes := []string{IconFolded, IconUnfolded, ConnMid, ConnLast}
-	for {
-		matched := false
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(s, prefix) {
-				s = s[len(prefix):]
-				matched = true
-			}
-		}
-		if !matched {
-			break
-		}
-	}
-	return s
+		return result.Nodes[index].Item.Container.SnapshotKey
+	},
 }
 
 // ContainerSnapshotRef returns the SnapshotKey for the container row at the given index.
@@ -200,17 +113,32 @@ func ContainerSnapshotRef(data any, folded map[string]bool, index int) string {
 	if !ok || index < 0 {
 		return ""
 	}
-	rows := buildContainerTree(infos, folded)
-	if index >= len(rows) {
+	result := BuildTree(containerTreeSpec, infos, folded)
+	if index >= len(result.Nodes) {
 		return ""
 	}
-	id := stripContainerPrefix(rows[index][0])
-	for _, info := range infos {
-		if info.Container.ID == id {
-			return info.Container.SnapshotKey
-		}
+	return result.Nodes[index].Item.Container.SnapshotKey
+}
+
+// ContainerSpec returns the formatted runtime spec for the container at the given row index.
+func ContainerSpec(data any, folded map[string]bool, index int) (string, string) {
+	infos, ok := data.([]ctr.ContainerInfo)
+	if !ok || index < 0 {
+		return "", ""
 	}
-	return ""
+	result := BuildTree(containerTreeSpec, infos, folded)
+	if index >= len(result.Nodes) {
+		return "", ""
+	}
+	item := result.Nodes[index].Item
+	if item.Spec == nil {
+		return "", ""
+	}
+	specJSON, err := json.MarshalIndent(item.Spec, "", "  ")
+	if err != nil {
+		return "", ""
+	}
+	return item.Container.ID, string(specJSON)
 }
 
 func formatContainerDetail(info ctr.ContainerInfo) (string, string) {
@@ -238,27 +166,4 @@ func formatContainerDetail(info ctr.ContainerInfo) (string, string) {
 		}
 	}
 	return c.ID, b.String()
-}
-
-// ContainerSpec returns the formatted runtime spec for the container at the given row index.
-func ContainerSpec(data any, folded map[string]bool, index int) (string, string) {
-	infos, ok := data.([]ctr.ContainerInfo)
-	if !ok || index < 0 {
-		return "", ""
-	}
-	rows := buildContainerTree(infos, folded)
-	if index >= len(rows) {
-		return "", ""
-	}
-	id := stripContainerPrefix(rows[index][0])
-	for _, info := range infos {
-		if info.Container.ID == id && info.Spec != nil {
-			specJSON, err := json.MarshalIndent(info.Spec, "", "  ")
-			if err != nil {
-				return "", ""
-			}
-			return id, string(specJSON)
-		}
-	}
-	return "", ""
 }

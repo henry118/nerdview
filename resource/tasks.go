@@ -136,6 +136,9 @@ var TaskKind = Kind{
 
 		return taskID(t), detail
 	},
+	GoToRef: func(data any, _ map[string]bool, index int) string {
+		return TaskContainerRef(data, nil, index)
+	},
 }
 
 func taskID(t ctr.TaskInfo) string {

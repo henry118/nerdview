@@ -17,6 +17,7 @@
 package resource
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -33,6 +34,20 @@ const (
 	ConnPipe     = "│  "
 	ConnBlank    = "   "
 )
+
+// FormatBytes formats a byte count into a human-readable string.
+func FormatBytes(b uint64) string {
+	switch {
+	case b >= 1<<30:
+		return fmt.Sprintf("%.1fG", float64(b)/float64(1<<30))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.1fM", float64(b)/float64(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.1fK", float64(b)/float64(1<<10))
+	default:
+		return fmt.Sprintf("%dB", b)
+	}
+}
 
 // ShortDigest truncates a "prefix:hex" string to show only the first 12 hex chars.
 // For example, "sha256:7a75083e5b5a8d59..." becomes "sha256:7a75083e5b5a".
@@ -70,15 +85,19 @@ type Kind struct {
 	InitFolded func(data any) map[string]bool
 	// ToDetail returns a title and formatted body for the detail dialog.
 	ToDetail func(data any, folded map[string]bool, index int) (title string, body string)
+	// GoToRef returns a navigation reference for the row at the given index.
+	// Used for cross-tab "go to" navigation. If nil, go-to is disabled.
+	GoToRef func(data any, folded map[string]bool, index int) string
 }
 
 // Tab wraps a table model with its Kind, raw data, and fold state.
 type Tab struct {
-	Kind    Kind
-	Table   table.Model
-	RawData any
-	Folded  map[string]bool
-	width   int
+	Kind      Kind
+	Table     table.Model
+	RawData   any
+	Folded    map[string]bool
+	goToRefs  []string
+	width     int
 }
 
 // NewTab creates a Tab for the given Kind with initial dimensions.
@@ -133,6 +152,19 @@ func (t *Tab) refreshRows() {
 	rows := t.Kind.ToRows(t.RawData, t.Folded)
 	t.Table.SetRows(rows)
 	t.recalcColumns()
+	t.buildGoToRefs(rows)
+}
+
+func (t *Tab) buildGoToRefs(rows []table.Row) {
+	if t.Kind.GoToRef == nil {
+		t.goToRefs = nil
+		return
+	}
+	refs := make([]string, len(rows))
+	for i := range rows {
+		refs[i] = t.Kind.GoToRef(t.RawData, t.Folded, i)
+	}
+	t.goToRefs = refs
 }
 
 // ToggleFold folds or unfolds the currently selected row.
@@ -158,6 +190,14 @@ func (t *Tab) recalcColumns() {
 	rows := t.Table.Rows()
 	cols := fitColumns(t.Kind.Columns, rows, t.width)
 	t.Table.SetColumns(cols)
+}
+
+// GoToRef returns the cached navigation reference for the row at the given index.
+func (t *Tab) GoToRef(index int) string {
+	if index >= 0 && index < len(t.goToRefs) {
+		return t.goToRefs[index]
+	}
+	return ""
 }
 
 // SelectedDetail returns the title and body for the currently selected row's detail view.
