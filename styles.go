@@ -14,80 +14,83 @@
 
 package main
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/henry118/nerdview/ui"
+)
 
 var (
 	styleHeader = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252")).
-			Background(lipgloss.Color("236")).
+			Foreground(lipgloss.Color(ui.ColorText)).
+			Background(lipgloss.Color(ui.ColorBase)).
 			Bold(true)
 
 	styleHeaderNS = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("115")).
+			Foreground(lipgloss.Color(ui.ColorTeal)).
 			Bold(true)
 
 	styleTabActive = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("white")).
-			Background(lipgloss.Color("63")).
+			Foreground(lipgloss.Color(ui.ColorBase)).
+			Background(lipgloss.Color(ui.ColorMauve)).
 			Bold(true).
 			Padding(0, 1)
 
 	styleTabInactive = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("243")).
+				Foreground(lipgloss.Color(ui.ColorOverlay0)).
 				Padding(0, 1)
 
 	styleStatsLabel = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245")).
-			Background(lipgloss.Color("236"))
+			Foreground(lipgloss.Color(ui.ColorSubtext0)).
+			Background(lipgloss.Color(ui.ColorBase))
 
 	styleStatsPID = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252")).
-			Background(lipgloss.Color("236"))
+			Foreground(lipgloss.Color(ui.ColorText)).
+			Background(lipgloss.Color(ui.ColorBase))
 
 	styleStatsCPU = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("214")).
-			Background(lipgloss.Color("236")).
+			Foreground(lipgloss.Color(ui.ColorPeach)).
+			Background(lipgloss.Color(ui.ColorBase)).
 			Bold(true)
 
 	styleStatsVMS = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("177")).
-			Background(lipgloss.Color("236"))
+			Foreground(lipgloss.Color(ui.ColorLavender)).
+			Background(lipgloss.Color(ui.ColorBase))
 
 	styleStatsRSS = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("114")).
-			Background(lipgloss.Color("236")).
+			Foreground(lipgloss.Color(ui.ColorGreen)).
+			Background(lipgloss.Color(ui.ColorBase)).
 			Bold(true)
 
 	styleStatsThreads = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("75")).
-				Background(lipgloss.Color("236"))
+				Foreground(lipgloss.Color(ui.ColorSapphire)).
+				Background(lipgloss.Color(ui.ColorBase))
 
 	styleStatsUptime = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("223")).
-				Background(lipgloss.Color("236"))
+				Foreground(lipgloss.Color(ui.ColorYellow)).
+				Background(lipgloss.Color(ui.ColorBase))
 
 	styleError = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("203")).
-			Background(lipgloss.Color("236")).
+			Foreground(lipgloss.Color(ui.ColorRed)).
+			Background(lipgloss.Color(ui.ColorBase)).
 			Bold(true)
 
 	styleNSList = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
+			BorderForeground(lipgloss.Color(ui.ColorSurface0)).
 			Padding(0, 1)
 
 	styleNSListTitle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("115")).
+				Foreground(lipgloss.Color(ui.ColorTeal)).
 				Bold(true).
 				Padding(0, 1)
 
 	styleNSListItem = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("250")).
+				Foreground(lipgloss.Color(ui.ColorText)).
 				Padding(0, 1)
 
 	styleNSListSelected = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("232")).
-				Background(lipgloss.Color("115")).
+				Foreground(lipgloss.Color(ui.ColorBase)).
+				Background(lipgloss.Color(ui.ColorMauve)).
 				Bold(true).
 				Padding(0, 1)
 )

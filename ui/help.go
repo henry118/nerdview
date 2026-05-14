@@ -22,12 +22,12 @@ import (
 
 var (
 	helpBarStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245")).
-			Background(lipgloss.Color("236"))
+			Foreground(lipgloss.Color(ColorSubtext0)).
+			Background(lipgloss.Color(ColorBase))
 
 	helpKeyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("115")).
-			Background(lipgloss.Color("236")).
+			Foreground(lipgloss.Color(ColorTeal)).
+			Background(lipgloss.Color(ColorBase)).
 			Bold(true)
 )
 

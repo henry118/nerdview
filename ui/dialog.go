@@ -25,18 +25,18 @@ import (
 var (
 	dialogBoxStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("63")).
+			BorderForeground(lipgloss.Color(ColorMauve)).
 			Padding(0, 1)
 
 	dialogTitleBarStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("229")).
-				Background(lipgloss.Color("63")).
+				Foreground(lipgloss.Color(ColorBase)).
+				Background(lipgloss.Color(ColorMauve)).
 				Padding(0, 1).
 				Align(lipgloss.Center)
 
 	dialogFooterStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("241")).
+				Foreground(lipgloss.Color(ColorOverlay0)).
 				Align(lipgloss.Right)
 )
 
@@ -126,7 +126,7 @@ func (d DialogModel) Update(msg tea.Msg) (DialogModel, tea.Cmd) {
 func (d DialogModel) View() string {
 	titleBar := dialogTitleBarStyle.Width(d.width).Render(d.Title)
 	separator := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("63")).
+		Foreground(lipgloss.Color(ColorMauve)).
 		Render(strings.Repeat("─", d.width))
 	content := d.viewport.View()
 	footer := dialogFooterStyle.Width(d.width).Render("Esc: close │ j/k: scroll")
