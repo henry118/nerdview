@@ -28,6 +28,7 @@ var ImageKind = Kind{
 		{Title: "Name", MinWidth: 20, Flex: true},
 		{Title: "Type", MinWidth: 12},
 		{Title: "Digest", MinWidth: 20},
+		{Title: "Layers", MinWidth: 6},
 		{Title: "Size", MinWidth: 10},
 	},
 	ToRows: func(data any, folded map[string]bool) []table.Row {
@@ -87,6 +88,7 @@ type visibleNode struct {
 }
 
 // ImageSnapshotRef returns the snapshot key for the image row at the given index.
+// Only returns a key for parent nodes (manifests/indices), not leaf nodes (configs/layers).
 func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
 	trees, ok := data.([]ctr.ImageTree)
 	if !ok || index < 0 {
@@ -96,7 +98,11 @@ func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
 	if index >= len(nodes) {
 		return ""
 	}
-	return nodes[index].node.SnapshotKey
+	n := nodes[index]
+	if !n.hasChildren {
+		return ""
+	}
+	return n.node.SnapshotKey
 }
 
 func collectFoldable(folded map[string]bool, node ctr.ImageTree) {
@@ -179,13 +185,16 @@ func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]boo
 
 		digest := shortDigest(node.Desc.Digest.String())
 		size := node.Desc.Size
+		layers := ""
 		if len(node.Children) > 0 {
 			size = totalSize(node)
+			layers = fmt.Sprintf("%d", countLayers(node))
 		}
 		rows = append(rows, table.Row{
 			displayName,
 			shortMediaType(node.Desc.MediaType),
 			digest,
+			layers,
 			formatSize(size),
 		})
 
@@ -220,6 +229,19 @@ func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]boo
 	return rows
 }
 
+
+func countLayers(node ctr.ImageTree) int {
+	count := 0
+	for _, child := range node.Children {
+		mt := shortMediaType(child.Desc.MediaType)
+		if strings.HasPrefix(mt, "layer") {
+			count++
+		} else {
+			count += countLayers(child)
+		}
+	}
+	return count
+}
 
 func totalSize(node ctr.ImageTree) int64 {
 	size := node.Desc.Size
