@@ -78,6 +78,26 @@ func TestFitColumns_EmptyRows(t *testing.T) {
 	}
 }
 
+func TestShortDigest(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"sha256:7a75083e5b5a8d593efe8917fe730ab29cd8a8e8a5dfc2fcea022ab5a20954e0", "sha256:7a75083e5b5a"},
+		{"sha256:abcdef", "sha256:abcdef"},
+		{"sha512:0123456789abcdef0123456789abcdef", "sha512:0123456789ab"},
+		{"no-colon-here", "no-colon-here"},
+		{"prefix:", "prefix:"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := ShortDigest(tt.input)
+		if got != tt.want {
+			t.Errorf("ShortDigest(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestTab_ToggleFold(t *testing.T) {
 	kind := Kind{
 		Name: "Test",

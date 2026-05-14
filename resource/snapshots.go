@@ -42,11 +42,10 @@ var SnapshotKind = Kind{
 		if !ok || index < 0 {
 			return ""
 		}
-		rows := buildSnapshotTree(infos, folded)
-		if index >= len(rows) {
+		name := snapshotNameAtIndex(infos, folded, index)
+		if name == "" {
 			return ""
 		}
-		name := stripTreePrefix(rows[index][0])
 		// Only root snapshots (no parent) are foldable
 		for _, info := range infos {
 			if info.Name == name && info.Parent == "" {
@@ -78,11 +77,10 @@ var SnapshotKind = Kind{
 		if !ok || index < 0 {
 			return "", ""
 		}
-		rows := buildSnapshotTree(infos, folded)
-		if index >= len(rows) {
+		name := snapshotNameAtIndex(infos, folded, index)
+		if name == "" {
 			return "", ""
 		}
-		name := stripTreePrefix(rows[index][0])
 		for _, info := range infos {
 			if info.Name == name {
 				return formatSnapshotDetail(info)
@@ -128,6 +126,40 @@ func buildSnapshotTree(infos []snapshots.Info, folded map[string]bool) []table.R
 	return rows
 }
 
+// snapshotNameAtIndex returns the full snapshot name for the visible row at the given index.
+func snapshotNameAtIndex(infos []snapshots.Info, folded map[string]bool, index int) string {
+	children := buildChildrenMap(infos)
+	var roots []string
+	for _, info := range infos {
+		if info.Parent == "" {
+			roots = append(roots, info.Name)
+		}
+	}
+	sort.Strings(roots)
+
+	var names []string
+	for _, root := range roots {
+		names = collectVisibleNames(names, root, true, children, folded)
+	}
+	if index >= 0 && index < len(names) {
+		return names[index]
+	}
+	return ""
+}
+
+func collectVisibleNames(names []string, name string, isRoot bool, children map[string][]string, folded map[string]bool) []string {
+	names = append(names, name)
+	hasChildren := len(children[name]) > 0
+	isFolded := isRoot && hasChildren && folded[name]
+	if isFolded {
+		return names
+	}
+	for _, child := range children[name] {
+		names = collectVisibleNames(names, child, false, children, folded)
+	}
+	return names
+}
+
 func appendTreeRows(rows []table.Row, name, prefix string, isRoot bool, isLast bool, byName map[string]snapshots.Info, children map[string][]string, folded map[string]bool) []table.Row {
 	info := byName[name]
 	hasChildren := len(children[name]) > 0
@@ -145,15 +177,16 @@ func appendTreeRows(rows []table.Row, name, prefix string, isRoot bool, isLast b
 		}
 	}
 
+	shortName := ShortDigest(name)
 	if isRoot {
-		displayName = foldIcon + name
+		displayName = foldIcon + shortName
 		childPrefix = ""
 	} else {
 		connector := "├─ "
 		if isLast {
 			connector = "└─ "
 		}
-		displayName = prefix + connector + name
+		displayName = prefix + connector + shortName
 		if isLast {
 			childPrefix = prefix + "   "
 		} else {
@@ -177,23 +210,6 @@ func appendTreeRows(rows []table.Row, name, prefix string, isRoot bool, isLast b
 		rows = appendTreeRows(rows, child, childPrefix, false, childIsLast, byName, children, folded)
 	}
 	return rows
-}
-
-func stripTreePrefix(s string) string {
-	prefixes := []string{"▸ ", "▾ ", "├─ ", "└─ ", "│  ", "   "}
-	for {
-		matched := false
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(s, prefix) {
-				s = s[len(prefix):]
-				matched = true
-			}
-		}
-		if !matched {
-			break
-		}
-	}
-	return s
 }
 
 func formatSnapshotDetail(info snapshots.Info) (string, string) {
