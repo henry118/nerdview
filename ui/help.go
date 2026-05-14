@@ -32,15 +32,16 @@ var (
 )
 
 // HelpView renders the bottom help bar showing key bindings, padded to width.
-func HelpView(width int, showGoTo, showBack bool) string {
+// goToLabel is the "go to" target label (e.g. "sn", "ctr"); empty means hidden.
+func HelpView(width int, goToLabel string, showBack bool) string {
 	parts := []string{
 		helpKeyStyle.Render("←/→") + helpBarStyle.Render(":resource  "),
 		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":fold/unfold  "),
 		helpKeyStyle.Render("n") + helpBarStyle.Render(":namespace  "),
 		helpKeyStyle.Render("s") + helpBarStyle.Render(":snapshotter  "),
 	}
-	if showGoTo {
-		parts = append(parts, helpKeyStyle.Render("g")+helpBarStyle.Render(":go to sn  "))
+	if goToLabel != "" {
+		parts = append(parts, helpKeyStyle.Render("g")+helpBarStyle.Render(":go to "+goToLabel+"  "))
 	}
 	if showBack {
 		parts = append(parts, helpKeyStyle.Render("b")+helpBarStyle.Render(":back  "))

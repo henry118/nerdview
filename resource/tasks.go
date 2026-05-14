@@ -23,6 +23,15 @@ import (
 	"github.com/henry118/nerdview/ctr"
 )
 
+// TaskContainerRef returns the container ID for the task row at the given index.
+func TaskContainerRef(data any, _ map[string]bool, index int) string {
+	tasks, ok := data.([]ctr.TaskInfo)
+	if !ok || index < 0 || index >= len(tasks) {
+		return ""
+	}
+	return tasks[index].Process.ID
+}
+
 var TaskKind = Kind{
 	Name: "Tasks",
 	Columns: []Column{

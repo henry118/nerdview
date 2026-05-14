@@ -22,7 +22,7 @@ import (
 )
 
 func TestHelpView_ContainsKeys(t *testing.T) {
-	view := HelpView(100, true, true)
+	view := HelpView(100, "sn", true)
 
 	keys := []string{"←/→", "Tab", "n", "s", "Enter", "Esc"}
 	for _, key := range keys {
@@ -30,10 +30,26 @@ func TestHelpView_ContainsKeys(t *testing.T) {
 			t.Errorf("HelpView should contain %q", key)
 		}
 	}
+	if !strings.Contains(view, "go to sn") {
+		t.Error("HelpView should contain 'go to sn' when goToLabel is 'sn'")
+	}
+	if !strings.Contains(view, "back") {
+		t.Error("HelpView should contain 'back' when showBack is true")
+	}
+}
+
+func TestHelpView_GoToCtr(t *testing.T) {
+	view := HelpView(100, "ctr", false)
+	if !strings.Contains(view, "go to ctr") {
+		t.Error("HelpView should contain 'go to ctr' when goToLabel is 'ctr'")
+	}
+	if strings.Contains(view, "back") {
+		t.Error("HelpView should not contain 'back' when showBack is false")
+	}
 }
 
 func TestHelpView_PadsToWidth(t *testing.T) {
-	view := HelpView(120, false, false)
+	view := HelpView(120, "", false)
 	viewWidth := lipgloss.Width(view)
 
 	if viewWidth < 120 {
@@ -42,8 +58,7 @@ func TestHelpView_PadsToWidth(t *testing.T) {
 }
 
 func TestHelpView_NarrowTerminal(t *testing.T) {
-	view := HelpView(20, false, false)
-	// Should not panic or produce empty output
+	view := HelpView(20, "", false)
 	if view == "" {
 		t.Error("HelpView should produce output even for narrow terminals")
 	}
