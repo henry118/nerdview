@@ -317,6 +317,12 @@ func formatImageDetail(node ctr.ImageTree) (string, string) {
 			fmt.Fprintf(&b, "  %s: %s\n", k, v)
 		}
 	}
+	if len(node.Labels) > 0 {
+		fmt.Fprintf(&b, "Labels:\n")
+		for k, v := range node.Labels {
+			fmt.Fprintf(&b, "  %s: %s\n", k, v)
+		}
+	}
 	title := node.Name
 	if title == "" {
 		title = node.Desc.Digest.String()
