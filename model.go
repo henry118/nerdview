@@ -33,6 +33,14 @@ import (
 
 const maxEvents = 200
 
+const (
+	tabImages     = 0
+	tabSnapshots  = 1
+	tabContainers = 2
+	tabTasks      = 3
+	tabEvents     = 4
+)
+
 type viewMode int
 
 const (
@@ -75,9 +83,9 @@ func newModel(client *ctr.Client, namespace string) model {
 		snapshotter: "overlayfs",
 		resources: []*resource.Tab{
 			ptab(resource.NewTab(resource.ImageKind, 80, 10)),
+			ptab(resource.NewTab(resource.SnapshotKind, 80, 10)),
 			ptab(resource.NewTab(resource.ContainerKind, 80, 10)),
 			ptab(resource.NewTab(resource.TaskKind, 80, 10)),
-			ptab(resource.NewTab(resource.SnapshotKind, 80, 10)),
 			ptab(resource.NewTab(resource.EventKind, 80, 10)),
 		},
 		dialog: ui.NewDialog(80, 24),
@@ -103,8 +111,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// overhead: header (1) + blank (1) + tab bar (1) + help bar (1) = 4
-		tableHeight := m.height - 4
+		// overhead: stats (1) + tab bar (1) + help bar (1) = 3
+		tableHeight := m.height - 3
 		if tableHeight < 3 {
 			tableHeight = 3
 		}
@@ -136,10 +144,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case resourcesLoadedMsg:
 		if msg.namespace == m.namespaces[m.activeNS] {
-			m.resources[0].UpdateData(msg.images)
-			m.resources[1].UpdateData(msg.containers)
-			m.resources[2].UpdateData(msg.tasks)
-			m.resources[3].UpdateData(msg.snapshots)
+			m.resources[tabImages].UpdateData(msg.images)
+			m.resources[tabSnapshots].UpdateData(msg.snapshots)
+			m.resources[tabContainers].UpdateData(msg.containers)
+			m.resources[tabTasks].UpdateData(msg.tasks)
 		}
 		return m, nil
 
@@ -157,7 +165,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.events) > maxEvents {
 				m.events = m.events[:maxEvents]
 			}
-			m.resources[4].UpdateData(m.events)
+			m.resources[tabEvents].UpdateData(m.events)
 		}
 		return m, tea.Batch(cmds...)
 
@@ -177,19 +185,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case imagesRefreshedMsg:
-		m.resources[0].UpdateData([]ctr.ImageTree(msg))
-		return m, nil
-
-	case containersRefreshedMsg:
-		m.resources[1].UpdateData([]ctr.ContainerInfo(msg))
-		return m, nil
-
-	case tasksRefreshedMsg:
-		m.resources[2].UpdateData([]ctr.TaskInfo(msg))
+		m.resources[tabImages].UpdateData([]ctr.ImageTree(msg))
 		return m, nil
 
 	case snapshotsRefreshedMsg:
-		m.resources[3].UpdateData([]snapshots.Info(msg))
+		m.resources[tabSnapshots].UpdateData([]snapshots.Info(msg))
+		return m, nil
+
+	case containersRefreshedMsg:
+		m.resources[tabContainers].UpdateData([]ctr.ContainerInfo(msg))
+		return m, nil
+
+	case tasksRefreshedMsg:
+		m.resources[tabTasks].UpdateData([]ctr.TaskInfo(msg))
 		return m, nil
 
 	case errorMsg:
@@ -241,7 +249,7 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.activeNS = m.nsCursor
 			m.mode = modeNormal
 			m.events = nil
-			m.resources[4].UpdateData(m.events)
+			m.resources[tabEvents].UpdateData(m.events)
 			logging.Info("switched to namespace: %s", m.namespaces[m.activeNS])
 			return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
 		}
@@ -318,14 +326,14 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			var targetTab int
 			var targetKey string
 			switch m.activeRes {
-			case 0:
-				targetTab = 3
+			case tabImages:
+				targetTab = tabSnapshots
 				targetKey = resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
-			case 1:
-				targetTab = 3
+			case tabContainers:
+				targetTab = tabSnapshots
 				targetKey = resource.ContainerSnapshotRef(tab.RawData, tab.Folded, idx)
-			case 2:
-				targetTab = 1
+			case tabTasks:
+				targetTab = tabContainers
 				targetKey = resource.TaskContainerRef(tab.RawData, tab.Folded, idx)
 			}
 			if targetKey != "" {
@@ -379,16 +387,12 @@ func (m model) View() string {
 		return "Loading..."
 	}
 
-	// Header bar: app name, namespace, daemon stats
-	headerContent := styleHeader.Render(" nerdview ") +
-		styleHeaderNS.Render(fmt.Sprintf("[ns:%s]", m.namespaces[m.activeNS])) +
-		m.renderDaemonStats()
-	headerWidth := lipgloss.Width(headerContent)
-	headerPad := ""
-	if m.width > headerWidth {
-		headerPad = styleHeader.Render(strings.Repeat(" ", m.width-headerWidth))
+	// Stats bar: namespace + daemon metrics
+	statsBar := m.renderStatsBar()
+	statsWidth := lipgloss.Width(statsBar)
+	if m.width > statsWidth {
+		statsBar += styleStatsLabel.Render(strings.Repeat(" ", m.width-statsWidth))
 	}
-	header := headerContent + headerPad
 
 	// Tab bar: resource tabs
 	var tabs []string
@@ -402,41 +406,47 @@ func (m model) View() string {
 	tabBar := strings.Join(tabs, "")
 	tabBarWidth := lipgloss.Width(tabBar)
 	if m.width > tabBarWidth {
-		tabBar += styleTabInactive.Background(lipgloss.Color("235")).Render(
+		tabBar += styleTabInactive.Background(lipgloss.Color(ui.ColorBase)).Render(
 			strings.Repeat(" ", m.width-tabBarWidth))
 	}
 
 	// Table
 	tableView := m.resources[m.activeRes].Table.View()
 
-	// Help bar
+	// Help bar with position indicator
+	tab := m.resources[m.activeRes]
+	rowCount := len(tab.Table.Rows())
 	var goToLabel string
 	switch m.activeRes {
-	case 0:
+	case tabImages:
 		if resource.ImageSnapshotRef(
-			m.resources[0].RawData, m.resources[0].Folded, m.resources[0].Table.Cursor()) != "" {
+			m.resources[tabImages].RawData, m.resources[tabImages].Folded, m.resources[tabImages].Table.Cursor()) != "" {
 			goToLabel = "sn"
 		}
-	case 1:
+	case tabContainers:
 		if resource.ContainerSnapshotRef(
-			m.resources[1].RawData, m.resources[1].Folded, m.resources[1].Table.Cursor()) != "" {
+			m.resources[tabContainers].RawData, m.resources[tabContainers].Folded, m.resources[tabContainers].Table.Cursor()) != "" {
 			goToLabel = "sn"
 		}
-	case 2:
+	case tabTasks:
 		if resource.TaskContainerRef(
-			m.resources[2].RawData, m.resources[2].Folded, m.resources[2].Table.Cursor()) != "" {
+			m.resources[tabTasks].RawData, m.resources[tabTasks].Folded, m.resources[tabTasks].Table.Cursor()) != "" {
 			goToLabel = "ctr"
 		}
 	}
 	canGoBack := len(m.navHistory) > 0
-	helpBar := ui.HelpView(m.width, goToLabel, canGoBack)
+	var posIndicator string
+	if rowCount > 0 {
+		posIndicator = fmt.Sprintf("%d/%d", tab.Table.Cursor()+1, rowCount)
+	}
+	helpBar := ui.HelpView(m.width, goToLabel, canGoBack, posIndicator)
 	if m.err != nil {
 		errText := fmt.Sprintf(" ERROR: %s ", m.err.Error())
 		errPad := strings.Repeat(" ", max(0, m.width-len(errText)))
 		helpBar = styleError.Render(errText + errPad)
 	}
 
-	content := lipgloss.JoinVertical(lipgloss.Left, header, "", tabBar, tableView, helpBar)
+	content := lipgloss.JoinVertical(lipgloss.Left, statsBar, tabBar, tableView, helpBar)
 
 	// Overlay selectors
 	if m.mode == modeNSSelect {
@@ -481,19 +491,19 @@ func (m model) overlaySelector(title string, items []string, cursor int) string 
 	)
 }
 
-func (m model) renderDaemonStats() string {
+func (m model) renderStatsBar() string {
+	ns := styleStatsLabel.Render(" ns:") + styleHeaderNS.Render(m.namespaces[m.activeNS])
 	s := m.daemonStats
 	if s.PID == 0 {
-		return ""
+		return ns
 	}
-	label := styleHeader.Render(" daemon ")
-	pid := styleStatsLabel.Render("pid:") + styleStatsPID.Render(fmt.Sprintf("%d", s.PID))
+	pid := styleStatsLabel.Render("  pid:") + styleStatsPID.Render(fmt.Sprintf("%d", s.PID))
 	cpu := styleStatsLabel.Render(" cpu:") + styleStatsCPU.Render(fmt.Sprintf("%.1f%%", s.CPUPct))
 	vms := styleStatsLabel.Render(" vms:") + styleStatsVMS.Render(formatBytes(s.VMS))
 	rss := styleStatsLabel.Render(" rss:") + styleStatsRSS.Render(formatBytes(s.RSS))
 	threads := styleStatsLabel.Render(" threads:") + styleStatsThreads.Render(fmt.Sprintf("%d", s.Threads))
 	up := styleStatsLabel.Render(" up:") + styleStatsUptime.Render(formatDuration(s.Uptime))
-	return label + pid + cpu + vms + rss + threads + up
+	return ns + pid + cpu + vms + rss + threads + up
 }
 
 func formatBytes(b uint64) string {

@@ -22,7 +22,7 @@ import (
 )
 
 func TestHelpView_ContainsKeys(t *testing.T) {
-	view := HelpView(100, "sn", true)
+	view := HelpView(100, "sn", true, "3/47")
 
 	keys := []string{"←/→", "Tab", "n", "s", "Enter", "Esc"}
 	for _, key := range keys {
@@ -36,10 +36,13 @@ func TestHelpView_ContainsKeys(t *testing.T) {
 	if !strings.Contains(view, "back") {
 		t.Error("HelpView should contain 'back' when showBack is true")
 	}
+	if !strings.Contains(view, "3/47") {
+		t.Error("HelpView should contain position indicator '3/47'")
+	}
 }
 
 func TestHelpView_GoToCtr(t *testing.T) {
-	view := HelpView(100, "ctr", false)
+	view := HelpView(100, "ctr", false, "")
 	if !strings.Contains(view, "go to ctr") {
 		t.Error("HelpView should contain 'go to ctr' when goToLabel is 'ctr'")
 	}
@@ -49,7 +52,7 @@ func TestHelpView_GoToCtr(t *testing.T) {
 }
 
 func TestHelpView_PadsToWidth(t *testing.T) {
-	view := HelpView(120, "", false)
+	view := HelpView(120, "", false, "")
 	viewWidth := lipgloss.Width(view)
 
 	if viewWidth < 120 {
@@ -58,8 +61,19 @@ func TestHelpView_PadsToWidth(t *testing.T) {
 }
 
 func TestHelpView_NarrowTerminal(t *testing.T) {
-	view := HelpView(20, "", false)
+	view := HelpView(20, "", false, "")
 	if view == "" {
 		t.Error("HelpView should produce output even for narrow terminals")
+	}
+}
+
+func TestHelpView_PositionRightAligned(t *testing.T) {
+	view := HelpView(120, "", false, "12/99")
+	viewWidth := lipgloss.Width(view)
+	if viewWidth < 120 {
+		t.Errorf("HelpView with position should fill to width, got %d", viewWidth)
+	}
+	if !strings.Contains(view, "12/99") {
+		t.Error("HelpView should contain position '12/99'")
 	}
 }
