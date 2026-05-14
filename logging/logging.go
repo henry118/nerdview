@@ -30,13 +30,13 @@ func Init(enabled bool) error {
 		return nil
 	}
 	pid = os.Getpid()
-	logPath := fmt.Sprintf("/var/log/nerdtui-%d.log", pid)
+	logPath := fmt.Sprintf("/var/log/nerdview-%d.log", pid)
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file %s: %w", logPath, err)
 	}
 	file = f
-	Info("nerdtui started, log=%s", logPath)
+	Info("nerdview started, log=%s", logPath)
 	return nil
 }
 

@@ -22,7 +22,7 @@ import (
 	_ "github.com/containerd/containerd/api/events" // register protobuf event types
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/typeurl/v2"
-	"github.com/henry118/nerdtui/logging"
+	"github.com/henry118/nerdview/logging"
 )
 
 // EventMsg is a Bubble Tea message carrying a single containerd event.

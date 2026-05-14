@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/henry118/nerdtui/ctr"
+	"github.com/henry118/nerdview/ctr"
 )
 
 var ContainerKind = Kind{

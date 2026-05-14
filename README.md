@@ -1,8 +1,8 @@
-# nerdtui
+# nerdview
 
-[![CI](https://github.com/henry118/nerdtui/actions/workflows/ci.yml/badge.svg)](https://github.com/henry118/nerdtui/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/henry118/nerdtui)](https://goreportcard.com/report/github.com/henry118/nerdtui)
-[![License](https://img.shields.io/github/license/henry118/nerdtui)](LICENSE)
+[![CI](https://github.com/henry118/nerdview/actions/workflows/ci.yml/badge.svg)](https://github.com/henry118/nerdview/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/henry118/nerdview)](https://goreportcard.com/report/github.com/henry118/nerdview)
+[![License](https://img.shields.io/github/license/henry118/nerdview)](LICENSE)
 
 A terminal UI for [containerd](https://containerd.io/). Browse images, containers, tasks, snapshots, and events in real time.
 
@@ -22,8 +22,8 @@ A terminal UI for [containerd](https://containerd.io/). Browse images, container
 ## Install
 
 ```bash
-git clone https://github.com/henry118/nerdtui.git
-cd nerdtui
+git clone https://github.com/henry118/nerdview.git
+cd nerdview
 make build
 ```
 
@@ -32,9 +32,9 @@ Requires Go 1.26+.
 ## Usage
 
 ```bash
-sudo ./nerdtui                        # default namespace
-sudo ./nerdtui -n k8s.io              # specify namespace
-CONTAINERD_ADDRESS=/path/to/sock ./nerdtui  # custom socket
+sudo ./nerdview                        # default namespace
+sudo ./nerdview -n k8s.io              # specify namespace
+CONTAINERD_ADDRESS=/path/to/sock ./nerdview  # custom socket
 ```
 
 The binary needs access to the containerd socket (default: `/run/containerd/containerd.sock`).

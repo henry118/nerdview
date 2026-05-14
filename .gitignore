@@ -2,7 +2,7 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 # Built binary
-/nerdtui
+/nerdview
 
 # Binaries for programs and plugins
 *.exe

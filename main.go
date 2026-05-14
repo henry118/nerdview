@@ -22,14 +22,14 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/henry118/nerdtui/ctr"
-	"github.com/henry118/nerdtui/logging"
+	"github.com/henry118/nerdview/ctr"
+	"github.com/henry118/nerdview/logging"
 )
 
 func main() {
 	namespace := flag.String("namespace", "default", "containerd namespace")
 	flag.StringVar(namespace, "n", "default", "containerd namespace (shorthand)")
-	debug := flag.Bool("debug", false, "enable debug logging to /var/log/nerdtui-<pid>.log")
+	debug := flag.Bool("debug", false, "enable debug logging to /var/log/nerdview-<pid>.log")
 	flag.Parse()
 
 	if err := logging.Init(*debug); err != nil {
@@ -61,5 +61,5 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
-	logging.Info("nerdtui exited normally")
+	logging.Info("nerdview exited normally")
 }

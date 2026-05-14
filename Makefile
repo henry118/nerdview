@@ -1,4 +1,4 @@
-BINARY := nerdtui
+BINARY := nerdview
 GO := go
 GOFLAGS ?=
 

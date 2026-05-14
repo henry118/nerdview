@@ -16,7 +16,7 @@ package main
 
 import (
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/henry118/nerdtui/ctr"
+	"github.com/henry118/nerdview/ctr"
 )
 
 type namespacesLoadedMsg struct {

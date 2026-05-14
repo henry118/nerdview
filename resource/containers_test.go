@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/henry118/nerdtui/ctr"
+	"github.com/henry118/nerdview/ctr"
 )
 
 func testContainers() []ctr.ContainerInfo {
