@@ -126,9 +126,9 @@ func buildContainerTree(infos []ctr.ContainerInfo, folded map[string]bool) []tab
 		foldIcon := ""
 		if hasChildren {
 			if isFolded {
-				foldIcon = "▸ "
+				foldIcon = IconFolded
 			} else {
-				foldIcon = "▾ "
+				foldIcon = IconUnfolded
 			}
 		}
 
@@ -147,9 +147,9 @@ func buildContainerTree(infos []ctr.ContainerInfo, folded map[string]bool) []tab
 		kids := sandboxChildren[id]
 		for i, childID := range kids {
 			child := byID[childID]
-			connector := "├─ "
+			connector := ConnMid
 			if i == len(kids)-1 {
-				connector = "└─ "
+				connector = ConnLast
 			}
 			rows = append(rows, table.Row{
 				connector + child.Container.ID,
@@ -178,7 +178,7 @@ func buildContainerTree(infos []ctr.ContainerInfo, folded map[string]bool) []tab
 }
 
 func stripContainerPrefix(s string) string {
-	prefixes := []string{"▸ ", "▾ ", "├─ ", "└─ "}
+	prefixes := []string{IconFolded, IconUnfolded, ConnMid, ConnLast}
 	for {
 		matched := false
 		for _, prefix := range prefixes {

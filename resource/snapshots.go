@@ -171,9 +171,9 @@ func appendTreeRows(rows []table.Row, name, prefix string, isRoot bool, isLast b
 	foldIcon := ""
 	if isRoot && hasChildren {
 		if isFolded {
-			foldIcon = "▸ "
+			foldIcon = IconFolded
 		} else {
-			foldIcon = "▾ "
+			foldIcon = IconUnfolded
 		}
 	}
 
@@ -182,15 +182,15 @@ func appendTreeRows(rows []table.Row, name, prefix string, isRoot bool, isLast b
 		displayName = foldIcon + shortName
 		childPrefix = ""
 	} else {
-		connector := "├─ "
+		connector := ConnMid
 		if isLast {
-			connector = "└─ "
+			connector = ConnLast
 		}
 		displayName = prefix + connector + shortName
 		if isLast {
-			childPrefix = prefix + "   "
+			childPrefix = prefix + ConnBlank
 		} else {
-			childPrefix = prefix + "│  "
+			childPrefix = prefix + ConnPipe
 		}
 	}
 

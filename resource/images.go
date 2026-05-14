@@ -161,23 +161,23 @@ func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]boo
 			foldIcon := ""
 			if len(node.Children) > 0 {
 				if isFolded {
-					foldIcon = "▸ "
+					foldIcon = IconFolded
 				} else {
-					foldIcon = "▾ "
+					foldIcon = IconUnfolded
 				}
 			}
 			displayName = foldIcon + node.Name
 		} else {
-			connector := "├─ "
+			connector := ConnMid
 			if e.isLast {
-				connector = "└─ "
+				connector = ConnLast
 			}
 			foldIcon := ""
 			if len(node.Children) > 0 {
 				if isFolded {
-					foldIcon = "▸ "
+					foldIcon = IconFolded
 				} else {
-					foldIcon = "▾ "
+					foldIcon = IconUnfolded
 				}
 			}
 			displayName = e.prefix + connector + foldIcon + node.Name
@@ -207,9 +207,9 @@ func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]boo
 		if e.isRoot {
 			childPrefix = ""
 		} else if e.isLast {
-			childPrefix = e.prefix + "   "
+			childPrefix = e.prefix + ConnBlank
 		} else {
-			childPrefix = e.prefix + "│  "
+			childPrefix = e.prefix + ConnPipe
 		}
 
 		// Insert children at the front of stack to maintain DFS order
