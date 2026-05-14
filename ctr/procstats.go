@@ -138,6 +138,48 @@ func parseKBValue(line string) uint64 {
 	return 0
 }
 
+// ProcessRoot returns the root filesystem path for the given PID.
+func ProcessRoot(pid uint32) string {
+	if pid == 0 {
+		return ""
+	}
+	target, err := os.Readlink(fmt.Sprintf("/proc/%d/root", pid))
+	if err != nil {
+		return ""
+	}
+	return target
+}
+
+// ProcessCwd returns the working directory for the given PID.
+func ProcessCwd(pid uint32) string {
+	if pid == 0 {
+		return ""
+	}
+	target, err := os.Readlink(fmt.Sprintf("/proc/%d/cwd", pid))
+	if err != nil {
+		return ""
+	}
+	return target
+}
+
+// ProcessCgroup returns the cgroup paths for the given PID.
+func ProcessCgroup(pid uint32) []string {
+	if pid == 0 {
+		return nil
+	}
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	if err != nil || len(data) == 0 {
+		return nil
+	}
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
 // ProcessNamespaces returns the Linux namespace inode IDs for the given PID.
 func ProcessNamespaces(pid uint32) map[string]string {
 	if pid == 0 {
