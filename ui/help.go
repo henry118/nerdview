@@ -29,11 +29,16 @@ var (
 			Foreground(lipgloss.Color(ColorTeal)).
 			Background(lipgloss.Color(ColorBase)).
 			Bold(true)
+
+	helpPosStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(ColorOverlay0)).
+			Background(lipgloss.Color(ColorBase))
 )
 
 // HelpView renders the bottom help bar showing key bindings, padded to width.
 // goToLabel is the "go to" target label (e.g. "sn", "ctr"); empty means hidden.
-func HelpView(width int, goToLabel string, showBack bool) string {
+// position is a row indicator like "3/47"; empty means hidden.
+func HelpView(width int, goToLabel string, showBack bool, position string) string {
 	parts := []string{
 		helpKeyStyle.Render("←/→") + helpBarStyle.Render(":resource  "),
 		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":fold/unfold  "),
@@ -48,11 +53,21 @@ func HelpView(width int, goToLabel string, showBack bool) string {
 	}
 	parts = append(parts,
 		helpKeyStyle.Render("Enter")+helpBarStyle.Render(":detail  "),
-		helpKeyStyle.Render("Esc")+helpBarStyle.Render(":quit"),
+		helpKeyStyle.Render("q/Esc")+helpBarStyle.Render(":quit"),
 	)
 	text := strings.Join(parts, "")
 	textWidth := lipgloss.Width(text)
-	if width > textWidth {
+
+	if position != "" {
+		posText := helpPosStyle.Render(position)
+		posWidth := lipgloss.Width(posText)
+		gap := width - textWidth - posWidth
+		if gap > 0 {
+			text += helpBarStyle.Render(strings.Repeat(" ", gap)) + posText
+		} else {
+			text += " " + posText
+		}
+	} else if width > textWidth {
 		text += helpBarStyle.Render(strings.Repeat(" ", width-textWidth))
 	}
 	return text

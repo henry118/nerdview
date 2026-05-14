@@ -77,7 +77,7 @@ var keys = keyMap{
 		key.WithHelp("Esc", "back/quit"),
 	),
 	Quit: key.NewBinding(
-		key.WithKeys("ctrl+c"),
-		key.WithHelp("Ctrl+C", "quit"),
+		key.WithKeys("ctrl+c", "q"),
+		key.WithHelp("q/Ctrl+C", "quit"),
 	),
 }

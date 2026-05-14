@@ -20,11 +20,6 @@ import (
 )
 
 var (
-	styleHeader = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ui.ColorText)).
-			Background(lipgloss.Color(ui.ColorBase)).
-			Bold(true)
-
 	styleHeaderNS = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ui.ColorTeal)).
 			Bold(true)
