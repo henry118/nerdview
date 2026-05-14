@@ -79,6 +79,9 @@ var ImageKind = Kind{
 		}
 		return formatImageDetail(nodes[index].node)
 	},
+	GoToRef: func(data any, folded map[string]bool, index int) string {
+		return ImageSnapshotRef(data, folded, index)
+	},
 }
 
 type visibleNode struct {

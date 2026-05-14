@@ -74,6 +74,9 @@ var ContainerKind = Kind{
 		}
 		return "", ""
 	},
+	GoToRef: func(data any, folded map[string]bool, index int) string {
+		return ContainerSnapshotRef(data, folded, index)
+	},
 }
 
 func buildSandboxChildren(infos []ctr.ContainerInfo) map[string][]string {

@@ -337,18 +337,13 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.GoTo):
 		tab := m.resources[m.activeRes]
 		idx := tab.Table.Cursor()
+		targetKey := tab.GoToRef(idx)
 		var targetTab int
-		var targetKey string
 		switch m.activeRes {
-		case tabImages:
+		case tabImages, tabContainers:
 			targetTab = tabSnapshots
-			targetKey = resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
-		case tabContainers:
-			targetTab = tabSnapshots
-			targetKey = resource.ContainerSnapshotRef(tab.RawData, tab.Folded, idx)
 		case tabTasks:
 			targetTab = tabContainers
-			targetKey = resource.TaskContainerRef(tab.RawData, tab.Folded, idx)
 		}
 		if targetKey != "" {
 			m.navHistory = append(m.navHistory, navState{
@@ -441,20 +436,11 @@ func (m model) View() string {
 	tab := m.resources[m.activeRes]
 	rowCount := len(tab.Table.Rows())
 	var goToLabel string
-	switch m.activeRes {
-	case tabImages:
-		if resource.ImageSnapshotRef(
-			m.resources[tabImages].RawData, m.resources[tabImages].Folded, m.resources[tabImages].Table.Cursor()) != "" {
+	if tab.GoToRef(tab.Table.Cursor()) != "" {
+		switch m.activeRes {
+		case tabImages, tabContainers:
 			goToLabel = "sn"
-		}
-	case tabContainers:
-		if resource.ContainerSnapshotRef(
-			m.resources[tabContainers].RawData, m.resources[tabContainers].Folded, m.resources[tabContainers].Table.Cursor()) != "" {
-			goToLabel = "sn"
-		}
-	case tabTasks:
-		if resource.TaskContainerRef(
-			m.resources[tabTasks].RawData, m.resources[tabTasks].Folded, m.resources[tabTasks].Table.Cursor()) != "" {
+		case tabTasks:
 			goToLabel = "ctr"
 		}
 	}
