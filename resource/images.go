@@ -102,20 +102,19 @@ var ImageKind = Kind{
 		}
 		return formatImageDetail(result.Nodes[index].Item)
 	},
-	GoToRef: func(data any, folded map[string]bool, index int) string {
+	GoToRefs: func(data any, folded map[string]bool) []string {
 		trees, ok := data.([]ctr.ImageTree)
-		if !ok || index < 0 {
-			return ""
+		if !ok {
+			return nil
 		}
 		result := BuildTree(imageTreeSpec, trees, folded)
-		if index >= len(result.Nodes) {
-			return ""
+		refs := make([]string, len(result.Nodes))
+		for i, node := range result.Nodes {
+			if node.HasChildren {
+				refs[i] = node.Item.SnapshotKey
+			}
 		}
-		node := result.Nodes[index]
-		if !node.HasChildren {
-			return ""
-		}
-		return node.Item.SnapshotKey
+		return refs
 	},
 }
 

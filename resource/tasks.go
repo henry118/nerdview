@@ -136,8 +136,16 @@ var TaskKind = Kind{
 
 		return taskID(t), detail
 	},
-	GoToRef: func(data any, _ map[string]bool, index int) string {
-		return TaskContainerRef(data, nil, index)
+	GoToRefs: func(data any, _ map[string]bool) []string {
+		tasks, ok := data.([]ctr.TaskInfo)
+		if !ok {
+			return nil
+		}
+		refs := make([]string, len(tasks))
+		for i, t := range tasks {
+			refs[i] = t.ContainerID
+		}
+		return refs
 	},
 }
 

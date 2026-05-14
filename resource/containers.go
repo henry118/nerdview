@@ -94,16 +94,17 @@ var ContainerKind = Kind{
 		}
 		return formatContainerDetail(result.Nodes[index].Item)
 	},
-	GoToRef: func(data any, folded map[string]bool, index int) string {
+	GoToRefs: func(data any, folded map[string]bool) []string {
 		infos, ok := data.([]ctr.ContainerInfo)
-		if !ok || index < 0 {
-			return ""
+		if !ok {
+			return nil
 		}
 		result := BuildTree(containerTreeSpec, infos, folded)
-		if index >= len(result.Nodes) {
-			return ""
+		refs := make([]string, len(result.Nodes))
+		for i, node := range result.Nodes {
+			refs[i] = node.Item.Container.SnapshotKey
 		}
-		return result.Nodes[index].Item.Container.SnapshotKey
+		return refs
 	},
 }
 
