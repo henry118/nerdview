@@ -85,9 +85,9 @@ type Kind struct {
 	InitFolded func(data any) map[string]bool
 	// ToDetail returns a title and formatted body for the detail dialog.
 	ToDetail func(data any, folded map[string]bool, index int) (title string, body string)
-	// GoToRef returns a navigation reference for the row at the given index.
+	// GoToRefs returns navigation references for all visible rows.
 	// Used for cross-tab "go to" navigation. If nil, go-to is disabled.
-	GoToRef func(data any, folded map[string]bool, index int) string
+	GoToRefs func(data any, folded map[string]bool) []string
 }
 
 // Tab wraps a table model with its Kind, raw data, and fold state.
@@ -152,19 +152,15 @@ func (t *Tab) refreshRows() {
 	rows := t.Kind.ToRows(t.RawData, t.Folded)
 	t.Table.SetRows(rows)
 	t.recalcColumns()
-	t.buildGoToRefs(rows)
+	t.buildGoToRefs()
 }
 
-func (t *Tab) buildGoToRefs(rows []table.Row) {
-	if t.Kind.GoToRef == nil {
+func (t *Tab) buildGoToRefs() {
+	if t.Kind.GoToRefs == nil {
 		t.goToRefs = nil
 		return
 	}
-	refs := make([]string, len(rows))
-	for i := range rows {
-		refs[i] = t.Kind.GoToRef(t.RawData, t.Folded, i)
-	}
-	t.goToRefs = refs
+	t.goToRefs = t.Kind.GoToRefs(t.RawData, t.Folded)
 }
 
 // ToggleFold folds or unfolds the currently selected row.
