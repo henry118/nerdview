@@ -86,6 +86,19 @@ type visibleNode struct {
 	hasChildren bool
 }
 
+// ImageSnapshotRef returns the snapshot key for the image row at the given index.
+func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
+	trees, ok := data.([]ctr.ImageTree)
+	if !ok || index < 0 {
+		return ""
+	}
+	nodes := flattenVisibleNodes(trees, folded)
+	if index >= len(nodes) {
+		return ""
+	}
+	return nodes[index].node.SnapshotKey
+}
+
 func collectFoldable(folded map[string]bool, node ctr.ImageTree) {
 	if len(node.Children) > 0 {
 		folded[node.Desc.Digest.String()] = true

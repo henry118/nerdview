@@ -24,6 +24,8 @@ type keyMap struct {
 	SelectNS          key.Binding
 	SelectSnapshotter key.Binding
 	ToggleFold        key.Binding
+	GoTo              key.Binding
+	GoBack            key.Binding
 	Enter             key.Binding
 	Escape            key.Binding
 	Quit              key.Binding
@@ -57,6 +59,14 @@ var keys = keyMap{
 	ToggleFold: key.NewBinding(
 		key.WithKeys("tab"),
 		key.WithHelp("Tab", "fold/unfold"),
+	),
+	GoTo: key.NewBinding(
+		key.WithKeys("g"),
+		key.WithHelp("g", "go to snapshot"),
+	),
+	GoBack: key.NewBinding(
+		key.WithKeys("b"),
+		key.WithHelp("b", "go back"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),

@@ -138,15 +138,17 @@ func (c *Client) Snapshots(ctx context.Context, ns string, snapshotter string) (
 
 // ImageTree represents an image and its content hierarchy (manifests, configs, layers).
 type ImageTree struct {
-	Name     string
-	Desc     ocispec.Descriptor
-	Children []ImageTree
+	Name        string
+	Desc        ocispec.Descriptor
+	Children    []ImageTree
+	SnapshotKey string // Chain ID referencing the snapshot tree root (from content labels).
 }
 
 // ImageTrees returns all images in the namespace as trees, walking the content
 // store to resolve manifests and layers. Unknown media types and unpulled
-// manifests are filtered out.
-func (c *Client) ImageTrees(ctx context.Context, ns string) ([]ImageTree, error) {
+// manifests are filtered out. The snapshotter name is used to resolve
+// snapshot cross-references from content labels.
+func (c *Client) ImageTrees(ctx context.Context, ns, snapshotter string) ([]ImageTree, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	imgList, err := c.inner.ImageService().List(ctx)
 	if err != nil {
@@ -155,6 +157,7 @@ func (c *Client) ImageTrees(ctx context.Context, ns string) ([]ImageTree, error)
 	}
 	logging.Debug("loaded %d images in ns=%s", len(imgList), ns)
 	store := c.inner.ContentStore()
+	snLabel := "containerd.io/gc.ref.snapshot." + snapshotter
 	var trees []ImageTree
 	for _, img := range imgList {
 		if !isKnownDescriptor(img.Target) {
@@ -164,7 +167,7 @@ func (c *Client) ImageTrees(ctx context.Context, ns string) ([]ImageTree, error)
 			Name: img.Name,
 			Desc: img.Target,
 		}
-		tree.Children = walkContent(ctx, store, img.Target)
+		tree.Children = walkContent(ctx, store, snLabel, img.Target)
 		trees = append(trees, tree)
 	}
 	return trees, nil
@@ -210,7 +213,7 @@ func isManifestType(mediaType string) bool {
 	return false
 }
 
-func walkContent(ctx context.Context, store content.Store, desc ocispec.Descriptor) []ImageTree {
+func walkContent(ctx context.Context, store content.Store, snLabel string, desc ocispec.Descriptor) []ImageTree {
 	children, err := images.Children(ctx, store, desc)
 	if err != nil {
 		return nil
@@ -222,11 +225,27 @@ func walkContent(ctx context.Context, store content.Store, desc ocispec.Descript
 		}
 		node := ImageTree{
 			Desc:     child,
-			Children: walkContent(ctx, store, child),
+			Children: walkContent(ctx, store, snLabel, child),
 		}
 		// Skip manifests that have no children (content not downloaded)
 		if isManifestType(child.MediaType) && len(node.Children) == 0 {
 			continue
+		}
+		// Read content info labels for snapshot cross-reference.
+		info, err := store.Info(ctx, child.Digest)
+		if err == nil {
+			if key, ok := info.Labels[snLabel]; ok {
+				node.SnapshotKey = key
+			}
+		}
+		// Propagate snapshot key from children (config blob) up to manifest.
+		if node.SnapshotKey == "" {
+			for _, c := range node.Children {
+				if c.SnapshotKey != "" {
+					node.SnapshotKey = c.SnapshotKey
+					break
+				}
+			}
 		}
 		result = append(result, node)
 	}
