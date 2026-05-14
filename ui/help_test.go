@@ -22,7 +22,7 @@ import (
 )
 
 func TestHelpView_ContainsKeys(t *testing.T) {
-	view := HelpView(100)
+	view := HelpView(100, true, true)
 
 	keys := []string{"←/→", "Tab", "n", "s", "Enter", "Esc"}
 	for _, key := range keys {
@@ -33,7 +33,7 @@ func TestHelpView_ContainsKeys(t *testing.T) {
 }
 
 func TestHelpView_PadsToWidth(t *testing.T) {
-	view := HelpView(120)
+	view := HelpView(120, false, false)
 	viewWidth := lipgloss.Width(view)
 
 	if viewWidth < 120 {
@@ -42,7 +42,7 @@ func TestHelpView_PadsToWidth(t *testing.T) {
 }
 
 func TestHelpView_NarrowTerminal(t *testing.T) {
-	view := HelpView(20)
+	view := HelpView(20, false, false)
 	// Should not panic or produce empty output
 	if view == "" {
 		t.Error("HelpView should produce output even for narrow terminals")

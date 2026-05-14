@@ -42,6 +42,11 @@ const (
 	modeSnapshotterSelect
 )
 
+type navState struct {
+	tabIndex int
+	cursor   int
+}
+
 type model struct {
 	client       *ctr.Client
 	namespaces   []string
@@ -57,6 +62,7 @@ type model struct {
 	nsCursor     int
 	daemonPID    int
 	daemonStats  ctr.DaemonStats
+	navHistory   []navState
 	width        int
 	height       int
 	err          error
@@ -306,6 +312,42 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case key.Matches(msg, keys.GoTo):
+			// From Images tab: jump to snapshot referenced by the selected image node
+			if m.activeRes == 0 {
+				tab := m.resources[0]
+				idx := tab.Table.Cursor()
+				snKey := resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
+				if snKey != "" {
+					m.navHistory = append(m.navHistory, navState{
+						tabIndex: m.activeRes,
+						cursor:   idx,
+					})
+					m.resources[m.activeRes].Table.Blur()
+					m.activeRes = 3
+					m.resources[m.activeRes].Table.Focus()
+					rows := m.resources[m.activeRes].Table.Rows()
+					for i, row := range rows {
+						if len(row) > 0 && strings.Contains(row[0], snKey) {
+							m.resources[m.activeRes].Table.SetCursor(i)
+							break
+						}
+					}
+				}
+			}
+			return m, nil
+
+		case key.Matches(msg, keys.GoBack):
+			if len(m.navHistory) > 0 {
+				prev := m.navHistory[len(m.navHistory)-1]
+				m.navHistory = m.navHistory[:len(m.navHistory)-1]
+				m.resources[m.activeRes].Table.Blur()
+				m.activeRes = prev.tabIndex
+				m.resources[m.activeRes].Table.Focus()
+				m.resources[m.activeRes].Table.SetCursor(prev.cursor)
+			}
+			return m, nil
+
 		case key.Matches(msg, keys.Enter):
 			tab := m.resources[m.activeRes]
 			title, body := tab.SelectedDetail()
@@ -359,7 +401,10 @@ func (m model) View() string {
 	tableView := m.resources[m.activeRes].Table.View()
 
 	// Help bar
-	helpBar := ui.HelpView(m.width)
+	canGoTo := m.activeRes == 0 && resource.ImageSnapshotRef(
+		m.resources[0].RawData, m.resources[0].Folded, m.resources[0].Table.Cursor()) != ""
+	canGoBack := len(m.navHistory) > 0
+	helpBar := ui.HelpView(m.width, canGoTo, canGoBack)
 	if m.err != nil {
 		errText := fmt.Sprintf(" ERROR: %s ", m.err.Error())
 		errPad := strings.Repeat(" ", max(0, m.width-len(errText)))
@@ -476,7 +521,7 @@ func loadNamespaces(client *ctr.Client) tea.Cmd {
 func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		imgs, err := client.ImageTrees(ctx, ns)
+		imgs, err := client.ImageTrees(ctx, ns, snapshotter)
 		if err != nil {
 			return errorMsg{err: err}
 		}
@@ -512,7 +557,7 @@ func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd 
 		ctx := context.Background()
 		switch {
 		case strings.HasPrefix(topic, "/images/"):
-			imgs, err := client.ImageTrees(ctx, ns)
+			imgs, err := client.ImageTrees(ctx, ns, snapshotter)
 			if err != nil {
 				return errorMsg{err: err}
 			}

@@ -32,15 +32,23 @@ var (
 )
 
 // HelpView renders the bottom help bar showing key bindings, padded to width.
-func HelpView(width int) string {
+func HelpView(width int, showGoTo, showBack bool) string {
 	parts := []string{
 		helpKeyStyle.Render("←/→") + helpBarStyle.Render(":resource  "),
 		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":fold/unfold  "),
 		helpKeyStyle.Render("n") + helpBarStyle.Render(":namespace  "),
 		helpKeyStyle.Render("s") + helpBarStyle.Render(":snapshotter  "),
-		helpKeyStyle.Render("Enter") + helpBarStyle.Render(":detail  "),
-		helpKeyStyle.Render("Esc") + helpBarStyle.Render(":quit"),
 	}
+	if showGoTo {
+		parts = append(parts, helpKeyStyle.Render("g")+helpBarStyle.Render(":go to sn  "))
+	}
+	if showBack {
+		parts = append(parts, helpKeyStyle.Render("b")+helpBarStyle.Render(":back  "))
+	}
+	parts = append(parts,
+		helpKeyStyle.Render("Enter")+helpBarStyle.Render(":detail  "),
+		helpKeyStyle.Render("Esc")+helpBarStyle.Render(":quit"),
+	)
 	text := strings.Join(parts, "")
 	textWidth := lipgloss.Width(text)
 	if width > textWidth {
