@@ -141,7 +141,8 @@ type ImageTree struct {
 	Name        string
 	Desc        ocispec.Descriptor
 	Children    []ImageTree
-	SnapshotKey string // Chain ID referencing the snapshot tree root (from content labels).
+	SnapshotKey string            // Chain ID referencing the snapshot tree root (from content labels).
+	Labels      map[string]string // Content store labels for this blob.
 }
 
 // ImageTrees returns all images in the namespace as trees, walking the content
@@ -166,6 +167,9 @@ func (c *Client) ImageTrees(ctx context.Context, ns, snapshotter string) ([]Imag
 		tree := ImageTree{
 			Name: img.Name,
 			Desc: img.Target,
+		}
+		if info, err := store.Info(ctx, img.Target.Digest); err == nil {
+			tree.Labels = info.Labels
 		}
 		tree.Children = walkContent(ctx, store, snLabel, img.Target)
 		trees = append(trees, tree)
@@ -234,6 +238,7 @@ func walkContent(ctx context.Context, store content.Store, snLabel string, desc 
 		// Read content info labels for snapshot cross-reference.
 		info, err := store.Info(ctx, child.Digest)
 		if err == nil {
+			node.Labels = info.Labels
 			if key, ok := info.Labels[snLabel]; ok {
 				node.SnapshotKey = key
 			}
