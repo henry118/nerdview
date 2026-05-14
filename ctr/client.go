@@ -22,6 +22,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	tasktypes "github.com/containerd/containerd/api/types/task"
+	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
@@ -31,6 +32,7 @@ import (
 	"github.com/henry118/nerdview/logging"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"google.golang.org/protobuf/proto"
 )
 
 // Client wraps a containerd gRPC client with convenience methods for
@@ -259,13 +261,18 @@ func walkContent(ctx context.Context, store content.Store, snLabel string, desc 
 
 // TaskInfo pairs a task process with its container's OCI runtime spec and bundle path.
 type TaskInfo struct {
-	Process    *tasktypes.Process
-	Spec       *specs.Spec
-	BundlePath string
+	ContainerID string
+	Process     *tasktypes.Process
+	ExecID      string
+	Spec        *specs.Spec
+	BundlePath  string
+	StartedAt   string
+	Cmdline     string
 }
 
 // TasksWithSpec returns all tasks in the namespace, each enriched with the
-// container's OCI runtime spec and computed bundle path.
+// container's OCI runtime spec and computed bundle path. Exec processes are
+// included as separate entries with ExecID set.
 func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	resp, err := c.inner.TaskService().List(ctx, &tasks.ListTasksRequest{})
@@ -280,7 +287,9 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 	}
 	var result []TaskInfo
 	for _, p := range resp.Tasks {
-		info := TaskInfo{Process: p}
+		info := TaskInfo{ContainerID: p.ID, Process: p}
+		info.StartedAt = ProcessStartTime(p.Pid)
+		info.Cmdline = ProcessCmdline(p.Pid)
 		container, err := c.inner.LoadContainer(ctx, p.ID)
 		if err == nil {
 			cInfo, err := container.Info(ctx)
@@ -293,8 +302,50 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 			}
 		}
 		result = append(result, info)
+
+		// Fetch exec processes via ListPids
+		execIDs := c.listExecIDs(ctx, p.ID)
+		for _, execID := range execIDs {
+			execResp, err := c.inner.TaskService().Get(ctx, &tasks.GetRequest{
+				ContainerID: p.ID,
+				ExecID:      execID,
+			})
+			if err != nil {
+				continue
+			}
+			result = append(result, TaskInfo{
+				ContainerID: p.ID,
+				Process:     execResp.Process,
+				ExecID:      execID,
+				StartedAt:   ProcessStartTime(execResp.Process.Pid),
+				Cmdline:     ProcessCmdline(execResp.Process.Pid),
+			})
+		}
 	}
 	return result, nil
+}
+
+func (c *Client) listExecIDs(ctx context.Context, containerID string) []string {
+	resp, err := c.inner.TaskService().ListPids(ctx, &tasks.ListPidsRequest{
+		ContainerID: containerID,
+	})
+	if err != nil {
+		return nil
+	}
+	var execIDs []string
+	for _, p := range resp.Processes {
+		if p.Info == nil {
+			continue
+		}
+		var details runcoptions.ProcessDetails
+		if err := proto.Unmarshal(p.Info.Value, &details); err != nil {
+			continue
+		}
+		if details.ExecID != "" {
+			execIDs = append(execIDs, details.ExecID)
+		}
+	}
+	return execIDs
 }
 
 

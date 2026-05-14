@@ -26,8 +26,8 @@ import (
 
 func TestTaskContainerRef(t *testing.T) {
 	data := []ctr.TaskInfo{
-		{Process: &tasktypes.Process{ID: "container-1", Pid: 1234, Status: tasktypes.Status_RUNNING}},
-		{Process: &tasktypes.Process{ID: "container-2", Pid: 5678, Status: tasktypes.Status_STOPPED}},
+		{ContainerID: "container-1", Process: &tasktypes.Process{ID: "container-1", Pid: 1234, Status: tasktypes.Status_RUNNING}},
+		{ContainerID: "container-2", Process: &tasktypes.Process{ID: "container-2", Pid: 5678, Status: tasktypes.Status_STOPPED}},
 	}
 
 	if got := TaskContainerRef(data, nil, 0); got != "container-1" {
@@ -47,18 +47,22 @@ func TestTaskContainerRef(t *testing.T) {
 func TestTaskKindToRows(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
+			ContainerID: "container-1",
 			Process: &tasktypes.Process{
 				ID:     "container-1",
 				Pid:    1234,
 				Status: tasktypes.Status_RUNNING,
 			},
+			StartedAt: "2025-01-01 10:00:00",
 		},
 		{
+			ContainerID: "container-2",
 			Process: &tasktypes.Process{
-				ID:     "container-2",
+				ID:     "exec-shell",
 				Pid:    5678,
-				Status: tasktypes.Status_STOPPED,
+				Status: tasktypes.Status_RUNNING,
 			},
+			ExecID: "exec-shell",
 		},
 	}
 
@@ -67,20 +71,41 @@ func TestTaskKindToRows(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("Expected 2 rows, got %d", len(rows))
 	}
+	// Init task: ID = container ID, Type = init
 	if rows[0][0] != "container-1" {
 		t.Errorf("Row 0 ID = %q, want %q", rows[0][0], "container-1")
 	}
-	if rows[0][1] != "1234" {
-		t.Errorf("Row 0 PID = %q, want %q", rows[0][1], "1234")
+	if rows[0][1] != "container-1" {
+		t.Errorf("Row 0 Container = %q, want %q", rows[0][1], "container-1")
 	}
-	if rows[0][2] != "RUNNING" {
-		t.Errorf("Row 0 Status = %q, want %q", rows[0][2], "RUNNING")
+	if rows[0][2] != "init" {
+		t.Errorf("Row 0 Type = %q, want %q", rows[0][2], "init")
+	}
+	if rows[0][3] != "1234" {
+		t.Errorf("Row 0 PID = %q, want %q", rows[0][3], "1234")
+	}
+	if rows[0][4] != "RUNNING" {
+		t.Errorf("Row 0 Status = %q, want %q", rows[0][4], "RUNNING")
+	}
+	if rows[0][6] != "2025-01-01 10:00:00" {
+		t.Errorf("Row 0 Started = %q, want %q", rows[0][6], "2025-01-01 10:00:00")
+	}
+	// Exec task: ID = exec ID, Container = container ID, Type = exec
+	if rows[1][0] != "exec-shell" {
+		t.Errorf("Row 1 ID = %q, want %q", rows[1][0], "exec-shell")
+	}
+	if rows[1][1] != "container-2" {
+		t.Errorf("Row 1 Container = %q, want %q", rows[1][1], "container-2")
+	}
+	if rows[1][2] != "exec" {
+		t.Errorf("Row 1 Type = %q, want %q", rows[1][2], "exec")
 	}
 }
 
 func TestTaskKindToDetail_Running(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
+			ContainerID: "my-container",
 			Process: &tasktypes.Process{
 				ID:         "my-container",
 				Pid:        1234,
@@ -88,6 +113,7 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 				ExitStatus: 0,
 			},
 			BundlePath: "/run/containerd/io.containerd.runtime.v2.task/default/my-container",
+			StartedAt:  "2025-01-01 10:00:00",
 			Spec: &specs.Spec{
 				Root: &specs.Root{Path: "/var/lib/containerd/rootfs", Readonly: true},
 				Process: &specs.Process{
@@ -104,6 +130,12 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 
 	if title != "my-container" {
 		t.Errorf("Title = %q, want %q", title, "my-container")
+	}
+	if !strings.Contains(body, "Type:         init") {
+		t.Error("Should show type as init")
+	}
+	if !strings.Contains(body, "Started:      2025-01-01 10:00:00") {
+		t.Error("Should show started timestamp")
 	}
 	if strings.Contains(body, "Exit Status") {
 		t.Error("Running task should NOT show exit info")
@@ -125,9 +157,36 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 	}
 }
 
+func TestTaskKindToDetail_Exec(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{
+			ContainerID: "my-container",
+			ExecID:      "my-exec",
+			Process: &tasktypes.Process{
+				ID:     "my-exec",
+				Pid:    9999,
+				Status: tasktypes.Status_RUNNING,
+			},
+		},
+	}
+
+	title, body := TaskKind.ToDetail(data, nil, 0)
+
+	if title != "my-exec" {
+		t.Errorf("Title = %q, want %q", title, "my-exec")
+	}
+	if !strings.Contains(body, "Type:         exec") {
+		t.Error("Should show type as exec")
+	}
+	if !strings.Contains(body, "Container:    my-container") {
+		t.Error("Should show container ID")
+	}
+}
+
 func TestTaskKindToDetail_Stopped(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
+			ContainerID: "exited-ctr",
 			Process: &tasktypes.Process{
 				ID:         "exited-ctr",
 				Pid:        0,

@@ -137,3 +137,86 @@ func parseKBValue(line string) uint64 {
 	}
 	return 0
 }
+
+// ProcessNamespaces returns the Linux namespace inode IDs for the given PID.
+func ProcessNamespaces(pid uint32) map[string]string {
+	if pid == 0 {
+		return nil
+	}
+	dir := fmt.Sprintf("/proc/%d/ns", pid)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	ns := make(map[string]string)
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), "_for_children") {
+			continue
+		}
+		target, err := os.Readlink(dir + "/" + entry.Name())
+		if err != nil {
+			continue
+		}
+		ns[entry.Name()] = target
+	}
+	return ns
+}
+
+// ProcessCmdline returns the command line of the given PID from /proc.
+func ProcessCmdline(pid uint32) string {
+	if pid == 0 {
+		return ""
+	}
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+	if err != nil || len(data) == 0 {
+		return ""
+	}
+	// cmdline is null-separated; replace nulls with spaces
+	for i := range data {
+		if data[i] == 0 {
+			data[i] = ' '
+		}
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// ProcessStartTime returns the start time of the given PID as a formatted timestamp.
+func ProcessStartTime(pid uint32) string {
+	if pid == 0 {
+		return ""
+	}
+	statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return ""
+	}
+	s := string(statData)
+	closeParenIdx := strings.LastIndex(s, ")")
+	if closeParenIdx < 0 {
+		return ""
+	}
+	fields := strings.Fields(s[closeParenIdx+2:])
+	if len(fields) <= 19 {
+		return ""
+	}
+	starttime, err := strconv.ParseUint(fields[19], 10, 64)
+	if err != nil {
+		return ""
+	}
+	uptimeData, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return ""
+	}
+	uptimeFields := strings.Fields(string(uptimeData))
+	if len(uptimeFields) == 0 {
+		return ""
+	}
+	systemUptime, err := strconv.ParseFloat(uptimeFields[0], 64)
+	if err != nil {
+		return ""
+	}
+	clkTck := uint64(100)
+	procStartSec := float64(starttime) / float64(clkTck)
+	bootTime := time.Now().Add(-time.Duration(systemUptime * float64(time.Second)))
+	startedAt := bootTime.Add(time.Duration(procStartSec * float64(time.Second)))
+	return startedAt.Format("2006-01-02 15:04:05")
+}
