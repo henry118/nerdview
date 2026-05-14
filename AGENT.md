@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 ## Project Overview
 
-nerdtui is a terminal UI for containerd. It connects to the containerd daemon via gRPC socket (`/run/containerd/containerd.sock`) and presents container resources in interactive terminal tables with a compact htop-like style.
+nerdview is a terminal UI for containerd. It connects to the containerd daemon via gRPC socket (`/run/containerd/containerd.sock`) and presents container resources in interactive terminal tables with a compact htop-like style.
 
 ## Build & Run
 
@@ -17,9 +17,9 @@ go test -run TestName ./pkg  # run a single test
 ```
 
 ```bash
-sudo ./nerdtui               # run with default namespace
-sudo ./nerdtui -n k8s.io     # run with specific namespace
-CONTAINERD_ADDRESS=/path/to/sock ./nerdtui  # custom socket
+sudo ./nerdview               # run with default namespace
+sudo ./nerdview -n k8s.io     # run with specific namespace
+CONTAINERD_ADDRESS=/path/to/sock ./nerdview  # custom socket
 ```
 
 Requires Go 1.25+. The binary needs access to a running containerd instance (typically requires root or membership in the appropriate socket group).
@@ -59,7 +59,7 @@ Requires Go 1.25+. The binary needs access to a running containerd instance (typ
 The app follows the Elm Architecture via [Bubble Tea](https://github.com/charmbracelet/bubbletea):
 
 ```
-nerdtui/
+nerdview/
 ├── main.go              # entry point: parse flags, create client, run tea.Program
 ├── model.go             # root model (Init/Update/View), overlay state, key routing
 ├── messages.go          # custom tea.Msg types

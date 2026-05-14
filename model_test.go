@@ -19,8 +19,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/henry118/nerdtui/ctr"
-	"github.com/henry118/nerdtui/resource"
+	"github.com/henry118/nerdview/ctr"
+	"github.com/henry118/nerdview/resource"
 )
 
 func testModel() model {

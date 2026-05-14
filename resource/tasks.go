@@ -20,7 +20,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/table"
 	tasktypes "github.com/containerd/containerd/api/types/task"
-	"github.com/henry118/nerdtui/ctr"
+	"github.com/henry118/nerdview/ctr"
 )
 
 var TaskKind = Kind{

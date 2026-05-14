@@ -17,7 +17,7 @@ package resource
 import (
 	"testing"
 
-	"github.com/henry118/nerdtui/ctr"
+	"github.com/henry118/nerdview/ctr"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

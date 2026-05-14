@@ -25,10 +25,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/containerd/containerd/v2/core/snapshots"
 
-	"github.com/henry118/nerdtui/ctr"
-	"github.com/henry118/nerdtui/logging"
-	"github.com/henry118/nerdtui/resource"
-	"github.com/henry118/nerdtui/ui"
+	"github.com/henry118/nerdview/ctr"
+	"github.com/henry118/nerdview/logging"
+	"github.com/henry118/nerdview/resource"
+	"github.com/henry118/nerdview/ui"
 )
 
 const maxEvents = 200
@@ -371,7 +371,7 @@ func (m model) View() string {
 	}
 
 	// Header bar: app name, namespace, daemon stats
-	headerContent := styleHeader.Render(" nerdtui ") +
+	headerContent := styleHeader.Render(" nerdview ") +
 		styleHeaderNS.Render(fmt.Sprintf("[ns:%s]", m.namespaces[m.activeNS])) +
 		m.renderDaemonStats()
 	headerWidth := lipgloss.Width(headerContent)

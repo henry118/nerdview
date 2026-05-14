@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	tasktypes "github.com/containerd/containerd/api/types/task"
-	"github.com/henry118/nerdtui/ctr"
+	"github.com/henry118/nerdview/ctr"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

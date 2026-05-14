@@ -1,4 +1,4 @@
-module github.com/henry118/nerdtui
+module github.com/henry118/nerdview
 
 go 1.26.2
 
