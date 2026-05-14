@@ -313,26 +313,32 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, keys.GoTo):
-			var snKey string
 			tab := m.resources[m.activeRes]
 			idx := tab.Table.Cursor()
+			var targetTab int
+			var targetKey string
 			switch m.activeRes {
 			case 0:
-				snKey = resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
+				targetTab = 3
+				targetKey = resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
 			case 1:
-				snKey = resource.ContainerSnapshotRef(tab.RawData, tab.Folded, idx)
+				targetTab = 3
+				targetKey = resource.ContainerSnapshotRef(tab.RawData, tab.Folded, idx)
+			case 2:
+				targetTab = 1
+				targetKey = resource.TaskContainerRef(tab.RawData, tab.Folded, idx)
 			}
-			if snKey != "" {
+			if targetKey != "" {
 				m.navHistory = append(m.navHistory, navState{
 					tabIndex: m.activeRes,
 					cursor:   idx,
 				})
 				m.resources[m.activeRes].Table.Blur()
-				m.activeRes = 3
+				m.activeRes = targetTab
 				m.resources[m.activeRes].Table.Focus()
 				rows := m.resources[m.activeRes].Table.Rows()
 				for i, row := range rows {
-					if len(row) > 0 && strings.Contains(row[0], snKey) {
+					if len(row) > 0 && strings.Contains(row[0], targetKey) {
 						m.resources[m.activeRes].Table.SetCursor(i)
 						break
 					}
@@ -404,17 +410,26 @@ func (m model) View() string {
 	tableView := m.resources[m.activeRes].Table.View()
 
 	// Help bar
-	var canGoTo bool
+	var goToLabel string
 	switch m.activeRes {
 	case 0:
-		canGoTo = resource.ImageSnapshotRef(
-			m.resources[0].RawData, m.resources[0].Folded, m.resources[0].Table.Cursor()) != ""
+		if resource.ImageSnapshotRef(
+			m.resources[0].RawData, m.resources[0].Folded, m.resources[0].Table.Cursor()) != "" {
+			goToLabel = "sn"
+		}
 	case 1:
-		canGoTo = resource.ContainerSnapshotRef(
-			m.resources[1].RawData, m.resources[1].Folded, m.resources[1].Table.Cursor()) != ""
+		if resource.ContainerSnapshotRef(
+			m.resources[1].RawData, m.resources[1].Folded, m.resources[1].Table.Cursor()) != "" {
+			goToLabel = "sn"
+		}
+	case 2:
+		if resource.TaskContainerRef(
+			m.resources[2].RawData, m.resources[2].Folded, m.resources[2].Table.Cursor()) != "" {
+			goToLabel = "ctr"
+		}
 	}
 	canGoBack := len(m.navHistory) > 0
-	helpBar := ui.HelpView(m.width, canGoTo, canGoBack)
+	helpBar := ui.HelpView(m.width, goToLabel, canGoBack)
 	if m.err != nil {
 		errText := fmt.Sprintf(" ERROR: %s ", m.err.Error())
 		errPad := strings.Repeat(" ", max(0, m.width-len(errText)))

@@ -24,6 +24,26 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func TestTaskContainerRef(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{Process: &tasktypes.Process{ID: "container-1", Pid: 1234, Status: tasktypes.Status_RUNNING}},
+		{Process: &tasktypes.Process{ID: "container-2", Pid: 5678, Status: tasktypes.Status_STOPPED}},
+	}
+
+	if got := TaskContainerRef(data, nil, 0); got != "container-1" {
+		t.Errorf("TaskContainerRef(0) = %q, want %q", got, "container-1")
+	}
+	if got := TaskContainerRef(data, nil, 1); got != "container-2" {
+		t.Errorf("TaskContainerRef(1) = %q, want %q", got, "container-2")
+	}
+	if got := TaskContainerRef(data, nil, 99); got != "" {
+		t.Errorf("TaskContainerRef(99) = %q, want empty", got)
+	}
+	if got := TaskContainerRef(nil, nil, 0); got != "" {
+		t.Errorf("TaskContainerRef(nil) = %q, want empty", got)
+	}
+}
+
 func TestTaskKindToRows(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
