@@ -27,31 +27,34 @@ func testContainers() []ctr.ContainerInfo {
 	return []ctr.ContainerInfo{
 		{
 			Container: containers.Container{
-				ID:        "sandbox-abc",
-				Image:     "registry.k8s.io/pause:3.9",
-				Runtime:   containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
-				CreatedAt: now,
-				SandboxID: "sandbox-abc",
+				ID:          "sandbox-abc",
+				Image:       "registry.k8s.io/pause:3.9",
+				Runtime:     containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
+				CreatedAt:   now,
+				SandboxID:   "sandbox-abc",
+				SnapshotKey: "sha256:sandbox-snap",
 			},
 			IsSandbox: true,
 		},
 		{
 			Container: containers.Container{
-				ID:        "app-container-1",
-				Image:     "docker.io/library/nginx:latest",
-				Runtime:   containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
-				CreatedAt: now,
-				SandboxID: "sandbox-abc",
+				ID:          "app-container-1",
+				Image:       "docker.io/library/nginx:latest",
+				Runtime:     containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
+				CreatedAt:   now,
+				SandboxID:   "sandbox-abc",
+				SnapshotKey: "sha256:app1-snap",
 			},
 			IsSandbox: false,
 		},
 		{
 			Container: containers.Container{
-				ID:        "app-container-2",
-				Image:     "docker.io/library/redis:7",
-				Runtime:   containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
-				CreatedAt: now,
-				SandboxID: "sandbox-abc",
+				ID:          "app-container-2",
+				Image:       "docker.io/library/redis:7",
+				Runtime:     containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
+				CreatedAt:   now,
+				SandboxID:   "sandbox-abc",
+				SnapshotKey: "sha256:app2-snap",
 			},
 			IsSandbox: false,
 		},
@@ -142,6 +145,42 @@ func TestContainerKindRowID(t *testing.T) {
 	id = ContainerKind.RowID(data, folded, 3)
 	if id != "" {
 		t.Errorf("RowID index 3 (standalone) = %q, want empty", id)
+	}
+}
+
+func TestContainerSnapshotRef(t *testing.T) {
+	data := testContainers()
+	folded := map[string]bool{}
+
+	// Index 0 = sandbox-abc
+	if got := ContainerSnapshotRef(data, folded, 0); got != "sha256:sandbox-snap" {
+		t.Errorf("ContainerSnapshotRef(0) = %q, want %q", got, "sha256:sandbox-snap")
+	}
+
+	// Index 1 = app-container-1 (child)
+	if got := ContainerSnapshotRef(data, folded, 1); got != "sha256:app1-snap" {
+		t.Errorf("ContainerSnapshotRef(1) = %q, want %q", got, "sha256:app1-snap")
+	}
+
+	// Index 3 = standalone-ctr (no snapshot key)
+	if got := ContainerSnapshotRef(data, folded, 3); got != "" {
+		t.Errorf("ContainerSnapshotRef(3) = %q, want empty", got)
+	}
+
+	// When sandbox is folded, index 1 = standalone-ctr
+	foldedMap := map[string]bool{"sandbox-abc": true}
+	if got := ContainerSnapshotRef(data, foldedMap, 1); got != "" {
+		t.Errorf("ContainerSnapshotRef(1, folded) = %q, want empty", got)
+	}
+
+	// Out of bounds
+	if got := ContainerSnapshotRef(data, folded, 99); got != "" {
+		t.Errorf("ContainerSnapshotRef(99) = %q, want empty", got)
+	}
+
+	// Nil data
+	if got := ContainerSnapshotRef(nil, folded, 0); got != "" {
+		t.Errorf("ContainerSnapshotRef(nil) = %q, want empty", got)
 	}
 }
 

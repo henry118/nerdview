@@ -193,6 +193,25 @@ func stripContainerPrefix(s string) string {
 	return s
 }
 
+// ContainerSnapshotRef returns the SnapshotKey for the container row at the given index.
+func ContainerSnapshotRef(data any, folded map[string]bool, index int) string {
+	infos, ok := data.([]ctr.ContainerInfo)
+	if !ok || index < 0 {
+		return ""
+	}
+	rows := buildContainerTree(infos, folded)
+	if index >= len(rows) {
+		return ""
+	}
+	id := stripContainerPrefix(rows[index][0])
+	for _, info := range infos {
+		if info.Container.ID == id {
+			return info.Container.SnapshotKey
+		}
+	}
+	return ""
+}
+
 func formatContainerDetail(info ctr.ContainerInfo) (string, string) {
 	c := info.Container
 	var b strings.Builder

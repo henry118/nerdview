@@ -313,25 +313,28 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, keys.GoTo):
-			// From Images tab: jump to snapshot referenced by the selected image node
-			if m.activeRes == 0 {
-				tab := m.resources[0]
-				idx := tab.Table.Cursor()
-				snKey := resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
-				if snKey != "" {
-					m.navHistory = append(m.navHistory, navState{
-						tabIndex: m.activeRes,
-						cursor:   idx,
-					})
-					m.resources[m.activeRes].Table.Blur()
-					m.activeRes = 3
-					m.resources[m.activeRes].Table.Focus()
-					rows := m.resources[m.activeRes].Table.Rows()
-					for i, row := range rows {
-						if len(row) > 0 && strings.Contains(row[0], snKey) {
-							m.resources[m.activeRes].Table.SetCursor(i)
-							break
-						}
+			var snKey string
+			tab := m.resources[m.activeRes]
+			idx := tab.Table.Cursor()
+			switch m.activeRes {
+			case 0:
+				snKey = resource.ImageSnapshotRef(tab.RawData, tab.Folded, idx)
+			case 1:
+				snKey = resource.ContainerSnapshotRef(tab.RawData, tab.Folded, idx)
+			}
+			if snKey != "" {
+				m.navHistory = append(m.navHistory, navState{
+					tabIndex: m.activeRes,
+					cursor:   idx,
+				})
+				m.resources[m.activeRes].Table.Blur()
+				m.activeRes = 3
+				m.resources[m.activeRes].Table.Focus()
+				rows := m.resources[m.activeRes].Table.Rows()
+				for i, row := range rows {
+					if len(row) > 0 && strings.Contains(row[0], snKey) {
+						m.resources[m.activeRes].Table.SetCursor(i)
+						break
 					}
 				}
 			}
@@ -401,8 +404,15 @@ func (m model) View() string {
 	tableView := m.resources[m.activeRes].Table.View()
 
 	// Help bar
-	canGoTo := m.activeRes == 0 && resource.ImageSnapshotRef(
-		m.resources[0].RawData, m.resources[0].Folded, m.resources[0].Table.Cursor()) != ""
+	var canGoTo bool
+	switch m.activeRes {
+	case 0:
+		canGoTo = resource.ImageSnapshotRef(
+			m.resources[0].RawData, m.resources[0].Folded, m.resources[0].Table.Cursor()) != ""
+	case 1:
+		canGoTo = resource.ContainerSnapshotRef(
+			m.resources[1].RawData, m.resources[1].Folded, m.resources[1].Table.Cursor()) != ""
+	}
 	canGoBack := len(m.navHistory) > 0
 	helpBar := ui.HelpView(m.width, canGoTo, canGoBack)
 	if m.err != nil {
