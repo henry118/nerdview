@@ -20,6 +20,18 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/henry118/nerdview/ui"
+)
+
+// Tree icons and connectors for hierarchical display.
+const (
+	IconFolded   = "▸ "
+	IconUnfolded = "▾ "
+	ConnMid      = "├─ "
+	ConnLast     = "└─ "
+	ConnPipe     = "│  "
+	ConnBlank    = "   "
 )
 
 // ShortDigest truncates a "prefix:hex" string to show only the first 12 hex chars.
@@ -80,6 +92,10 @@ func NewTab(kind Kind, width, height int) Tab {
 		table.WithWidth(width),
 	)
 	s := table.DefaultStyles()
+	s.Selected = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(ui.ColorBase)).
+		Background(lipgloss.Color(ui.ColorTeal))
 	t.SetStyles(s)
 
 	return Tab{
