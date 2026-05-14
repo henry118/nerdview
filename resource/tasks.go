@@ -98,8 +98,28 @@ var TaskKind = Kind{
 			}
 		}
 
+		if root := ctr.ProcessRoot(p.Pid); root != "" {
+			detail += fmt.Sprintf("Root:         %s\n", root)
+		}
+
+		if cwd := ctr.ProcessCwd(p.Pid); cwd != "" {
+			detail += fmt.Sprintf("Cwd:          %s\n", cwd)
+		}
+
 		if t.BundlePath != "" {
 			detail += fmt.Sprintf("Bundle:       %s\n", t.BundlePath)
+		}
+
+		if cgroups := ctr.ProcessCgroup(p.Pid); len(cgroups) > 0 {
+			first := true
+			for _, cg := range cgroups {
+				if first {
+					detail += fmt.Sprintf("Cgroup:       %s\n", cg)
+					first = false
+				} else {
+					detail += fmt.Sprintf("              %s\n", cg)
+				}
+			}
 		}
 
 		if namespaces := ctr.ProcessNamespaces(p.Pid); len(namespaces) > 0 {
