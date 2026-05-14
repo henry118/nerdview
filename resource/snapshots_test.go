@@ -103,24 +103,35 @@ func TestSnapshotKindRowID(t *testing.T) {
 	}
 }
 
-func TestStripTreePrefix(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"layer1", "layer1"},
-		{"▸ layer1", "layer1"},
-		{"▾ layer1", "layer1"},
-		{"├─ layer2", "layer2"},
-		{"└─ layer3", "layer3"},
-		{"│  └─ active1", "active1"},
-		{"├─ ▸ layer2", "layer2"},
-		{"   └─ ▾ deep", "deep"},
+func TestSnapshotNameAtIndex(t *testing.T) {
+	infos := testSnapshots()
+	folded := map[string]bool{}
+
+	// Unfolded order: layer1, layer2, layer3, active1, rootB, childB
+	if got := snapshotNameAtIndex(infos, folded, 0); got != "layer1" {
+		t.Errorf("index 0 = %q, want %q", got, "layer1")
 	}
-	for _, tt := range tests {
-		got := stripTreePrefix(tt.input)
-		if got != tt.want {
-			t.Errorf("stripTreePrefix(%q) = %q, want %q", tt.input, got, tt.want)
-		}
+	if got := snapshotNameAtIndex(infos, folded, 1); got != "layer2" {
+		t.Errorf("index 1 = %q, want %q", got, "layer2")
+	}
+	if got := snapshotNameAtIndex(infos, folded, 3); got != "active1" {
+		t.Errorf("index 3 = %q, want %q", got, "active1")
+	}
+	if got := snapshotNameAtIndex(infos, folded, 4); got != "rootB" {
+		t.Errorf("index 4 = %q, want %q", got, "rootB")
+	}
+
+	// Folded: layer1 folded hides its children
+	foldedMap := map[string]bool{"layer1": true}
+	if got := snapshotNameAtIndex(infos, foldedMap, 0); got != "layer1" {
+		t.Errorf("folded index 0 = %q, want %q", got, "layer1")
+	}
+	if got := snapshotNameAtIndex(infos, foldedMap, 1); got != "rootB" {
+		t.Errorf("folded index 1 = %q, want %q", got, "rootB")
+	}
+
+	// Out of bounds
+	if got := snapshotNameAtIndex(infos, folded, 99); got != "" {
+		t.Errorf("index 99 = %q, want empty", got)
 	}
 }

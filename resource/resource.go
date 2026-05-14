@@ -16,7 +16,24 @@
 // (images, containers, tasks, snapshots, events) in foldable tree tables.
 package resource
 
-import "github.com/charmbracelet/bubbles/table"
+import (
+	"strings"
+
+	"github.com/charmbracelet/bubbles/table"
+)
+
+// ShortDigest truncates a "prefix:hex" string to show only the first 12 hex chars.
+// For example, "sha256:7a75083e5b5a8d59..." becomes "sha256:7a75083e5b5a".
+// Strings without a colon are returned unchanged.
+func ShortDigest(s string) string {
+	if idx := strings.Index(s, ":"); idx >= 0 {
+		hex := s[idx+1:]
+		if len(hex) > 12 {
+			return s[:idx+1] + hex[:12]
+		}
+	}
+	return s
+}
 
 // Column defines a table column with optional flex behavior for dynamic sizing.
 type Column struct {
