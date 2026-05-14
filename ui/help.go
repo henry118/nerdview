@@ -35,21 +35,53 @@ var (
 			Background(lipgloss.Color(ColorBase))
 )
 
+// HelpOption configures the help bar.
+type HelpOption func(*helpConfig)
+
+type helpConfig struct {
+	goToLabel string
+	showBack  bool
+	showSpec  bool
+	position  string
+}
+
+func WithGoTo(label string) HelpOption {
+	return func(c *helpConfig) { c.goToLabel = label }
+}
+
+func WithBack() HelpOption {
+	return func(c *helpConfig) { c.showBack = true }
+}
+
+func WithSpec() HelpOption {
+	return func(c *helpConfig) { c.showSpec = true }
+}
+
+func WithPosition(pos string) HelpOption {
+	return func(c *helpConfig) { c.position = pos }
+}
+
 // HelpView renders the bottom help bar showing key bindings, padded to width.
-// goToLabel is the "go to" target label (e.g. "sn", "ctr"); empty means hidden.
-// position is a row indicator like "3/47"; empty means hidden.
-func HelpView(width int, goToLabel string, showBack bool, position string) string {
+func HelpView(width int, opts ...HelpOption) string {
+	var cfg helpConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	parts := []string{
 		helpKeyStyle.Render("←/→") + helpBarStyle.Render(":resource  "),
 		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":fold/unfold  "),
 		helpKeyStyle.Render("n") + helpBarStyle.Render(":namespace  "),
 		helpKeyStyle.Render("s") + helpBarStyle.Render(":snapshotter  "),
 	}
-	if goToLabel != "" {
-		parts = append(parts, helpKeyStyle.Render("g")+helpBarStyle.Render(":go to "+goToLabel+"  "))
+	if cfg.goToLabel != "" {
+		parts = append(parts, helpKeyStyle.Render("g")+helpBarStyle.Render(":go to "+cfg.goToLabel+"  "))
 	}
-	if showBack {
+	if cfg.showBack {
 		parts = append(parts, helpKeyStyle.Render("b")+helpBarStyle.Render(":back  "))
+	}
+	if cfg.showSpec {
+		parts = append(parts, helpKeyStyle.Render("p")+helpBarStyle.Render(":spec  "))
 	}
 	parts = append(parts,
 		helpKeyStyle.Render("Enter")+helpBarStyle.Render(":detail  "),
@@ -58,8 +90,8 @@ func HelpView(width int, goToLabel string, showBack bool, position string) strin
 	text := strings.Join(parts, "")
 	textWidth := lipgloss.Width(text)
 
-	if position != "" {
-		posText := helpPosStyle.Render(position)
+	if cfg.position != "" {
+		posText := helpPosStyle.Render(cfg.position)
 		posWidth := lipgloss.Width(posText)
 		gap := width - textWidth - posWidth
 		if gap > 0 {

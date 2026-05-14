@@ -20,7 +20,6 @@ import (
 
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/henry118/nerdview/ctr"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -114,15 +113,6 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 			},
 			BundlePath: "/run/containerd/io.containerd.runtime.v2.task/default/my-container",
 			StartedAt:  "2025-01-01 10:00:00",
-			Spec: &specs.Spec{
-				Root: &specs.Root{Path: "/var/lib/containerd/rootfs", Readonly: true},
-				Process: &specs.Process{
-					Args: []string{"/bin/sh", "-c", "echo hello"},
-					Cwd:  "/app",
-					User: specs.User{UID: 1000, GID: 1000},
-				},
-				Hostname: "my-host",
-			},
 		},
 	}
 
@@ -142,18 +132,6 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 	}
 	if !strings.Contains(body, "Bundle:") {
 		t.Error("Should contain bundle path")
-	}
-	if !strings.Contains(body, "Runtime Spec") {
-		t.Error("Should contain runtime spec section")
-	}
-	if !strings.Contains(body, "/var/lib/containerd/rootfs") {
-		t.Error("Should contain rootfs path in JSON")
-	}
-	if !strings.Contains(body, "echo hello") {
-		t.Error("Should contain process args in JSON")
-	}
-	if !strings.Contains(body, "my-host") {
-		t.Error("Should contain hostname in JSON")
 	}
 }
 

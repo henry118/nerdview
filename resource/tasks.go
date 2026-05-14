@@ -15,7 +15,6 @@
 package resource
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -115,12 +114,6 @@ var TaskKind = Kind{
 			}
 		}
 
-		if t.Spec != nil {
-			data, err := json.MarshalIndent(t.Spec, "", "  ")
-			if err == nil {
-				detail += "\n--- Runtime Spec ---\n" + string(data) + "\n"
-			}
-		}
 		return taskID(t), detail
 	},
 }
