@@ -15,6 +15,7 @@
 package resource
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -237,4 +238,27 @@ func formatContainerDetail(info ctr.ContainerInfo) (string, string) {
 		}
 	}
 	return c.ID, b.String()
+}
+
+// ContainerSpec returns the formatted runtime spec for the container at the given row index.
+func ContainerSpec(data any, folded map[string]bool, index int) (string, string) {
+	infos, ok := data.([]ctr.ContainerInfo)
+	if !ok || index < 0 {
+		return "", ""
+	}
+	rows := buildContainerTree(infos, folded)
+	if index >= len(rows) {
+		return "", ""
+	}
+	id := stripContainerPrefix(rows[index][0])
+	for _, info := range infos {
+		if info.Container.ID == id && info.Spec != nil {
+			specJSON, err := json.MarshalIndent(info.Spec, "", "  ")
+			if err != nil {
+				return "", ""
+			}
+			return id, string(specJSON)
+		}
+	}
+	return "", ""
 }

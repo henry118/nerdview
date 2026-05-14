@@ -87,6 +87,7 @@ func (c *Client) Namespaces(ctx context.Context) ([]string, error) {
 type ContainerInfo struct {
 	Container containers.Container
 	IsSandbox bool
+	Spec      *specs.Spec
 }
 
 // Containers returns all containers in the namespace with sandbox detection.
@@ -111,10 +112,15 @@ func (c *Client) Containers(ctx context.Context, ns string) ([]ContainerInfo, er
 	var result []ContainerInfo
 	for _, ctr := range ctrs {
 		info := ContainerInfo{Container: ctr}
-		// A container is a sandbox if it's registered in the sandbox store,
-		// or if its SandboxID equals its own ID
 		if sandboxIDs[ctr.ID] || ctr.SandboxID == ctr.ID {
 			info.IsSandbox = true
+		}
+		container, err := c.inner.LoadContainer(ctx, ctr.ID)
+		if err == nil {
+			spec, err := container.Spec(ctx)
+			if err == nil {
+				info.Spec = spec
+			}
 		}
 		result = append(result, info)
 	}
@@ -259,12 +265,11 @@ func walkContent(ctx context.Context, store content.Store, snLabel string, desc 
 	return result
 }
 
-// TaskInfo pairs a task process with its container's OCI runtime spec and bundle path.
+// TaskInfo pairs a task process with its bundle path and proc-derived metadata.
 type TaskInfo struct {
 	ContainerID string
 	Process     *tasktypes.Process
 	ExecID      string
-	Spec        *specs.Spec
 	BundlePath  string
 	StartedAt   string
 	Cmdline     string
@@ -295,10 +300,6 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 			cInfo, err := container.Info(ctx)
 			if err == nil {
 				info.BundlePath = "/run/containerd/" + cInfo.Runtime.Name + "/" + actualNS + "/" + p.ID
-			}
-			spec, err := container.Spec(ctx)
-			if err == nil {
-				info.Spec = spec
 			}
 		}
 		result = append(result, info)

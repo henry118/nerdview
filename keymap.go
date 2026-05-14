@@ -26,6 +26,7 @@ type keyMap struct {
 	ToggleFold        key.Binding
 	GoTo              key.Binding
 	GoBack            key.Binding
+	Spec              key.Binding
 	Enter             key.Binding
 	Escape            key.Binding
 	Quit              key.Binding
@@ -67,6 +68,10 @@ var keys = keyMap{
 	GoBack: key.NewBinding(
 		key.WithKeys("b"),
 		key.WithHelp("b", "go back"),
+	),
+	Spec: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "runtime spec"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),

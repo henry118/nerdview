@@ -365,6 +365,17 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case key.Matches(msg, keys.Spec):
+			if m.activeRes == tabContainers {
+				tab := m.resources[tabContainers]
+				title, body := resource.ContainerSpec(tab.RawData, tab.Folded, tab.Table.Cursor())
+				if title != "" {
+					m.dialog.SetContent(title, body)
+					m.mode = modeDialog
+				}
+			}
+			return m, nil
+
 		case key.Matches(msg, keys.Enter):
 			tab := m.resources[m.activeRes]
 			title, body := tab.SelectedDetail()
@@ -434,12 +445,20 @@ func (m model) View() string {
 			goToLabel = "ctr"
 		}
 	}
-	canGoBack := len(m.navHistory) > 0
-	var posIndicator string
-	if rowCount > 0 {
-		posIndicator = fmt.Sprintf("%d/%d", tab.Table.Cursor()+1, rowCount)
+	var helpOpts []ui.HelpOption
+	if goToLabel != "" {
+		helpOpts = append(helpOpts, ui.WithGoTo(goToLabel))
 	}
-	helpBar := ui.HelpView(m.width, goToLabel, canGoBack, posIndicator)
+	if len(m.navHistory) > 0 {
+		helpOpts = append(helpOpts, ui.WithBack())
+	}
+	if m.activeRes == tabContainers {
+		helpOpts = append(helpOpts, ui.WithSpec())
+	}
+	if rowCount > 0 {
+		helpOpts = append(helpOpts, ui.WithPosition(fmt.Sprintf("%d/%d", tab.Table.Cursor()+1, rowCount)))
+	}
+	helpBar := ui.HelpView(m.width, helpOpts...)
 	if m.err != nil {
 		errText := fmt.Sprintf(" ERROR: %s ", m.err.Error())
 		errPad := strings.Repeat(" ", max(0, m.width-len(errText)))
