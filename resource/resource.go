@@ -17,6 +17,7 @@
 package resource
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -33,6 +34,20 @@ const (
 	ConnPipe     = "│  "
 	ConnBlank    = "   "
 )
+
+// FormatBytes formats a byte count into a human-readable string.
+func FormatBytes(b uint64) string {
+	switch {
+	case b >= 1<<30:
+		return fmt.Sprintf("%.1fG", float64(b)/float64(1<<30))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.1fM", float64(b)/float64(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.1fK", float64(b)/float64(1<<10))
+	default:
+		return fmt.Sprintf("%dB", b)
+	}
+}
 
 // ShortDigest truncates a "prefix:hex" string to show only the first 12 hex chars.
 // For example, "sha256:7a75083e5b5a8d59..." becomes "sha256:7a75083e5b5a".

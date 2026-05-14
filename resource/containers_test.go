@@ -70,16 +70,24 @@ func testContainers() []ctr.ContainerInfo {
 	}
 }
 
-func TestBuildSandboxChildren(t *testing.T) {
+func TestContainerTreeNodes(t *testing.T) {
 	data := testContainers()
-	children := buildSandboxChildren(data)
+	result := BuildTree(containerTreeSpec, data, nil)
 
-	kids := children["sandbox-abc"]
-	if len(kids) != 2 {
-		t.Fatalf("sandbox-abc should have 2 children, got %d", len(kids))
+	if len(result.Nodes) != 4 {
+		t.Fatalf("Expected 4 nodes, got %d", len(result.Nodes))
 	}
-	if kids[0] != "app-container-1" || kids[1] != "app-container-2" {
-		t.Errorf("Children = %v, want [app-container-1 app-container-2]", kids)
+	if result.Nodes[0].ID != "sandbox-abc" || !result.Nodes[0].HasChildren {
+		t.Errorf("Node 0: ID=%q HasChildren=%v, want sandbox-abc with children", result.Nodes[0].ID, result.Nodes[0].HasChildren)
+	}
+	if result.Nodes[1].ID != "app-container-1" {
+		t.Errorf("Node 1: ID=%q, want app-container-1", result.Nodes[1].ID)
+	}
+	if result.Nodes[2].ID != "app-container-2" {
+		t.Errorf("Node 2: ID=%q, want app-container-2", result.Nodes[2].ID)
+	}
+	if result.Nodes[3].ID != "standalone-ctr" {
+		t.Errorf("Node 3: ID=%q, want standalone-ctr", result.Nodes[3].ID)
 	}
 }
 
@@ -184,21 +192,3 @@ func TestContainerSnapshotRef(t *testing.T) {
 	}
 }
 
-func TestStripContainerPrefix(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"sandbox-abc", "sandbox-abc"},
-		{"▸ sandbox-abc", "sandbox-abc"},
-		{"▾ sandbox-abc", "sandbox-abc"},
-		{"├─ app-container-1", "app-container-1"},
-		{"└─ app-container-2", "app-container-2"},
-	}
-	for _, tt := range tests {
-		got := stripContainerPrefix(tt.input)
-		if got != tt.want {
-			t.Errorf("stripContainerPrefix(%q) = %q, want %q", tt.input, got, tt.want)
-		}
-	}
-}

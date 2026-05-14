@@ -22,6 +22,35 @@ import (
 	"github.com/henry118/nerdview/ctr"
 )
 
+var imageTreeSpec = TreeSpec[ctr.ImageTree]{
+	ID: func(node ctr.ImageTree) string { return node.Desc.Digest.String() },
+	Children: func(node ctr.ImageTree) []ctr.ImageTree {
+		children := make([]ctr.ImageTree, len(node.Children))
+		for i, child := range node.Children {
+			if child.Name == "" {
+				child.Name = descLabel(child)
+			}
+			children[i] = child
+		}
+		return children
+	},
+	ToRow: func(node ctr.ImageTree, hasChildren bool) table.Row {
+		size := node.Desc.Size
+		layers := ""
+		if hasChildren {
+			size = totalSize(node)
+			layers = fmt.Sprintf("%d", countLayers(node))
+		}
+		return table.Row{
+			node.Name,
+			shortMediaType(node.Desc.MediaType),
+			ShortDigest(node.Desc.Digest.String()),
+			layers,
+			FormatBytes(uint64(size)),
+		}
+	},
+}
+
 var ImageKind = Kind{
 	Name: "Images",
 	Columns: []Column{
@@ -36,24 +65,20 @@ var ImageKind = Kind{
 		if !ok || len(trees) == 0 {
 			return nil
 		}
-		var rows []table.Row
-		for _, tree := range trees {
-			rows = appendImageRows(rows, tree, folded)
-		}
-		return rows
+		return BuildTree(imageTreeSpec, trees, folded).Rows
 	},
 	RowID: func(data any, folded map[string]bool, index int) string {
 		trees, ok := data.([]ctr.ImageTree)
 		if !ok || index < 0 {
 			return ""
 		}
-		nodes := flattenVisibleNodes(trees, folded)
-		if index >= len(nodes) {
+		result := BuildTree(imageTreeSpec, trees, folded)
+		if index >= len(result.Nodes) {
 			return ""
 		}
-		n := nodes[index]
-		if n.hasChildren {
-			return n.node.Desc.Digest.String()
+		node := result.Nodes[index]
+		if node.HasChildren {
+			return node.ID
 		}
 		return ""
 	},
@@ -63,9 +88,7 @@ var ImageKind = Kind{
 			return nil
 		}
 		folded := make(map[string]bool)
-		for _, tree := range trees {
-			collectFoldable(folded, tree)
-		}
+		DefaultFoldState(imageTreeSpec, trees, folded)
 		return folded
 	},
 	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
@@ -73,165 +96,45 @@ var ImageKind = Kind{
 		if !ok || index < 0 {
 			return "", ""
 		}
-		nodes := flattenVisibleNodes(trees, folded)
-		if index >= len(nodes) {
+		result := BuildTree(imageTreeSpec, trees, folded)
+		if index >= len(result.Nodes) {
 			return "", ""
 		}
-		return formatImageDetail(nodes[index].node)
+		return formatImageDetail(result.Nodes[index].Item)
 	},
 	GoToRef: func(data any, folded map[string]bool, index int) string {
-		return ImageSnapshotRef(data, folded, index)
+		trees, ok := data.([]ctr.ImageTree)
+		if !ok || index < 0 {
+			return ""
+		}
+		result := BuildTree(imageTreeSpec, trees, folded)
+		if index >= len(result.Nodes) {
+			return ""
+		}
+		node := result.Nodes[index]
+		if !node.HasChildren {
+			return ""
+		}
+		return node.Item.SnapshotKey
 	},
-}
-
-type visibleNode struct {
-	node        ctr.ImageTree
-	depth       int
-	hasChildren bool
 }
 
 // ImageSnapshotRef returns the snapshot key for the image row at the given index.
-// Only returns a key for parent nodes (manifests/indices), not leaf nodes (configs/layers).
 func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
 	trees, ok := data.([]ctr.ImageTree)
 	if !ok || index < 0 {
 		return ""
 	}
-	nodes := flattenVisibleNodes(trees, folded)
-	if index >= len(nodes) {
+	result := BuildTree(imageTreeSpec, trees, folded)
+	if index >= len(result.Nodes) {
 		return ""
 	}
-	n := nodes[index]
-	if !n.hasChildren {
+	node := result.Nodes[index]
+	if !node.HasChildren {
 		return ""
 	}
-	return n.node.SnapshotKey
+	return node.Item.SnapshotKey
 }
-
-func collectFoldable(folded map[string]bool, node ctr.ImageTree) {
-	if len(node.Children) > 0 {
-		folded[node.Desc.Digest.String()] = true
-		for _, child := range node.Children {
-			collectFoldable(folded, child)
-		}
-	}
-}
-
-func flattenVisibleNodes(trees []ctr.ImageTree, folded map[string]bool) []visibleNode {
-	var nodes []visibleNode
-	for _, tree := range trees {
-		nodes = flattenTree(nodes, tree, 0, folded)
-	}
-	return nodes
-}
-
-func flattenTree(nodes []visibleNode, node ctr.ImageTree, depth int, folded map[string]bool) []visibleNode {
-	hasChildren := len(node.Children) > 0
-	nodes = append(nodes, visibleNode{node: node, depth: depth, hasChildren: hasChildren})
-	if hasChildren && folded != nil && folded[node.Desc.Digest.String()] {
-		return nodes
-	}
-	for _, child := range node.Children {
-		if child.Name == "" {
-			child.Name = descLabel(child)
-		}
-		nodes = flattenTree(nodes, child, depth+1, folded)
-	}
-	return nodes
-}
-
-func appendImageRows(rows []table.Row, tree ctr.ImageTree, folded map[string]bool) []table.Row {
-	type entry struct {
-		node   ctr.ImageTree
-		prefix string
-		isLast bool
-		isRoot bool
-	}
-
-	// BFS-like iteration using a stack to maintain order
-	var stack []entry
-	stack = append(stack, entry{node: tree, isRoot: true})
-
-	for len(stack) > 0 {
-		e := stack[0]
-		stack = stack[1:]
-
-		node := e.node
-		isFolded := folded[node.Desc.Digest.String()] && len(node.Children) > 0
-
-		var displayName string
-		if e.isRoot {
-			foldIcon := ""
-			if len(node.Children) > 0 {
-				if isFolded {
-					foldIcon = IconFolded
-				} else {
-					foldIcon = IconUnfolded
-				}
-			}
-			displayName = foldIcon + node.Name
-		} else {
-			connector := ConnMid
-			if e.isLast {
-				connector = ConnLast
-			}
-			foldIcon := ""
-			if len(node.Children) > 0 {
-				if isFolded {
-					foldIcon = IconFolded
-				} else {
-					foldIcon = IconUnfolded
-				}
-			}
-			displayName = e.prefix + connector + foldIcon + node.Name
-		}
-
-		digest := ShortDigest(node.Desc.Digest.String())
-		size := node.Desc.Size
-		layers := ""
-		if len(node.Children) > 0 {
-			size = totalSize(node)
-			layers = fmt.Sprintf("%d", countLayers(node))
-		}
-		rows = append(rows, table.Row{
-			displayName,
-			shortMediaType(node.Desc.MediaType),
-			digest,
-			layers,
-			FormatBytes(uint64(size)),
-		})
-
-		if isFolded {
-			continue
-		}
-
-		// Queue children
-		var childPrefix string
-		if e.isRoot {
-			childPrefix = ""
-		} else if e.isLast {
-			childPrefix = e.prefix + ConnBlank
-		} else {
-			childPrefix = e.prefix + ConnPipe
-		}
-
-		// Insert children at the front of stack to maintain DFS order
-		var childEntries []entry
-		for i, child := range node.Children {
-			if child.Name == "" {
-				child.Name = descLabel(child)
-			}
-			childEntries = append(childEntries, entry{
-				node:   child,
-				prefix: childPrefix,
-				isLast: i == len(node.Children)-1,
-			})
-		}
-		stack = append(childEntries, stack...)
-	}
-	return rows
-}
-
 
 func countLayers(node ctr.ImageTree) int {
 	count := 0
@@ -293,19 +196,6 @@ func shortMediaType(mt string) string {
 			return mt[idx+1:]
 		}
 		return mt
-	}
-}
-
-func FormatBytes(b uint64) string {
-	switch {
-	case b >= 1<<30:
-		return fmt.Sprintf("%.1fG", float64(b)/float64(1<<30))
-	case b >= 1<<20:
-		return fmt.Sprintf("%.1fM", float64(b)/float64(1<<20))
-	case b >= 1<<10:
-		return fmt.Sprintf("%.1fK", float64(b)/float64(1<<10))
-	default:
-		return fmt.Sprintf("%dB", b)
 	}
 }
 
