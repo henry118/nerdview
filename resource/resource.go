@@ -139,6 +139,13 @@ func (t *Tab) SelectedDetail() (string, string) {
 func fitColumns(defs []Column, rows []table.Row, totalWidth int) []table.Column {
 	cols := make([]table.Column, len(defs))
 
+	// Each cell has 1 char padding on each side (from table.DefaultStyles)
+	cellPadding := 2 * len(defs)
+	availableWidth := totalWidth - cellPadding
+	if availableWidth < len(defs) {
+		availableWidth = len(defs)
+	}
+
 	widths := make([]int, len(defs))
 	for i, d := range defs {
 		widths[i] = len(d.Title)
@@ -162,19 +169,34 @@ func fitColumns(defs []Column, rows []table.Row, totalWidth int) []table.Column 
 	for _, w := range widths {
 		total += w
 	}
-	if total > totalWidth {
-		overflow := total - totalWidth
-		for i, d := range defs {
-			if d.Flex && overflow > 0 {
-				shrink := widths[i] - d.MinWidth
-				if shrink > overflow {
-					shrink = overflow
-				}
-				if shrink > 0 {
-					widths[i] -= shrink
-					overflow -= shrink
+	if total > availableWidth {
+		overflow := total - availableWidth
+		for overflow > 0 {
+			var flexCount int
+			for i, d := range defs {
+				if d.Flex && widths[i] > d.MinWidth {
+					flexCount++
 				}
 			}
+			if flexCount == 0 {
+				break
+			}
+			perCol := overflow / flexCount
+			if perCol == 0 {
+				perCol = 1
+			}
+			shrunk := 0
+			for i, d := range defs {
+				if d.Flex && widths[i] > d.MinWidth {
+					shrink := perCol
+					if shrink > widths[i]-d.MinWidth {
+						shrink = widths[i] - d.MinWidth
+					}
+					widths[i] -= shrink
+					shrunk += shrink
+				}
+			}
+			overflow -= shrunk
 		}
 	}
 

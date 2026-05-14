@@ -29,15 +29,19 @@ func TaskContainerRef(data any, _ map[string]bool, index int) string {
 	if !ok || index < 0 || index >= len(tasks) {
 		return ""
 	}
-	return tasks[index].Process.ID
+	return tasks[index].ContainerID
 }
 
 var TaskKind = Kind{
 	Name: "Tasks",
 	Columns: []Column{
-		{Title: "Container ID", MinWidth: 12, Flex: true},
-		{Title: "PID", MinWidth: 8},
-		{Title: "Status", MinWidth: 12},
+		{Title: "ID", MinWidth: 8, Flex: true},
+		{Title: "Container", MinWidth: 8, Flex: true},
+		{Title: "Type", MinWidth: 4},
+		{Title: "PID", MinWidth: 5},
+		{Title: "Status", MinWidth: 7},
+		{Title: "Cmdline", MinWidth: 10, Flex: true},
+		{Title: "Started", MinWidth: 19, Flex: true},
 	},
 	ToRows: func(data any, folded map[string]bool) []table.Row {
 		tasks, ok := data.([]ctr.TaskInfo)
@@ -46,10 +50,20 @@ var TaskKind = Kind{
 		}
 		rows := make([]table.Row, len(tasks))
 		for i, t := range tasks {
+			id := t.ContainerID
+			typ := "init"
+			if t.ExecID != "" {
+				id = t.ExecID
+				typ = "exec"
+			}
 			rows[i] = table.Row{
-				t.Process.ID,
+				id,
+				t.ContainerID,
+				typ,
 				fmt.Sprintf("%d", t.Process.Pid),
 				t.Process.Status.String(),
+				t.Cmdline,
+				t.StartedAt,
 			}
 		}
 		return rows
@@ -61,8 +75,22 @@ var TaskKind = Kind{
 		}
 		t := tasks[index]
 		p := t.Process
-		detail := fmt.Sprintf("Container ID: %s\nPID:          %d\nStatus:       %s\n",
-			p.ID, p.Pid, p.Status)
+
+		typ := "init"
+		if t.ExecID != "" {
+			typ = "exec"
+		}
+
+		detail := fmt.Sprintf("ID:           %s\nContainer:    %s\nType:         %s\nPID:          %d\nStatus:       %s\n",
+			taskID(t), t.ContainerID, typ, p.Pid, p.Status)
+
+		if t.Cmdline != "" {
+			detail += fmt.Sprintf("Cmdline:      %s\n", t.Cmdline)
+		}
+
+		if t.StartedAt != "" {
+			detail += fmt.Sprintf("Started:      %s\n", t.StartedAt)
+		}
 
 		if p.Status == tasktypes.Status_STOPPED {
 			detail += fmt.Sprintf("Exit Status:  %d\n", p.ExitStatus)
@@ -75,12 +103,31 @@ var TaskKind = Kind{
 			detail += fmt.Sprintf("Bundle:       %s\n", t.BundlePath)
 		}
 
+		if namespaces := ctr.ProcessNamespaces(p.Pid); len(namespaces) > 0 {
+			first := true
+			for _, target := range namespaces {
+				if first {
+					detail += fmt.Sprintf("Namespaces:   %s\n", target)
+					first = false
+				} else {
+					detail += fmt.Sprintf("              %s\n", target)
+				}
+			}
+		}
+
 		if t.Spec != nil {
 			data, err := json.MarshalIndent(t.Spec, "", "  ")
 			if err == nil {
 				detail += "\n--- Runtime Spec ---\n" + string(data) + "\n"
 			}
 		}
-		return p.ID, detail
+		return taskID(t), detail
 	},
+}
+
+func taskID(t ctr.TaskInfo) string {
+	if t.ExecID != "" {
+		return t.ExecID
+	}
+	return t.ContainerID
 }
