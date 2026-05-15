@@ -16,6 +16,7 @@ package resource
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	tasktypes "github.com/containerd/containerd/api/types/task"
@@ -75,69 +76,65 @@ func (taskKind) Detail(data any, _ map[string]bool, index int) (string, string) 
 	if !ok || index < 0 || index >= len(tasks) {
 		return "", ""
 	}
-	t := tasks[index]
-	p := t.Process
+	return formatTaskDetail(tasks[index])
+}
 
+func formatTaskDetail(t ctr.TaskInfo) (string, string) {
+	p := t.Process
 	typ := "init"
 	if t.ExecID != "" {
 		typ = "exec"
 	}
 
-	detail := fmt.Sprintf("ID:           %s\nContainer:    %s\nType:         %s\nPID:          %d\nStatus:       %s\n",
-		taskID(t), t.ContainerID, typ, p.Pid, p.Status)
+	var b strings.Builder
+	fmt.Fprintf(&b, "ID:           %s\n", taskID(t))
+	fmt.Fprintf(&b, "Container:    %s\n", t.ContainerID)
+	fmt.Fprintf(&b, "Type:         %s\n", typ)
+	fmt.Fprintf(&b, "PID:          %d\n", p.Pid)
+	fmt.Fprintf(&b, "Status:       %s\n", p.Status)
 
 	if t.Cmdline != "" {
-		detail += fmt.Sprintf("Cmdline:      %s\n", t.Cmdline)
+		fmt.Fprintf(&b, "Cmdline:      %s\n", t.Cmdline)
 	}
-
 	if t.StartedAt != "" {
-		detail += fmt.Sprintf("Started:      %s\n", t.StartedAt)
+		fmt.Fprintf(&b, "Started:      %s\n", t.StartedAt)
 	}
-
 	if p.Status == tasktypes.Status_STOPPED {
-		detail += fmt.Sprintf("Exit Status:  %d\n", p.ExitStatus)
+		fmt.Fprintf(&b, "Exit Status:  %d\n", p.ExitStatus)
 		if p.ExitedAt != nil {
-			detail += fmt.Sprintf("Exited At:    %s\n", p.ExitedAt.AsTime().Format("2006-01-02 15:04:05"))
+			fmt.Fprintf(&b, "Exited At:    %s\n", p.ExitedAt.AsTime().Format("2006-01-02 15:04:05"))
 		}
 	}
-
 	if root := ctr.ProcessRoot(p.Pid); root != "" {
-		detail += fmt.Sprintf("Root:         %s\n", root)
+		fmt.Fprintf(&b, "Root:         %s\n", root)
 	}
-
 	if cwd := ctr.ProcessCwd(p.Pid); cwd != "" {
-		detail += fmt.Sprintf("Cwd:          %s\n", cwd)
+		fmt.Fprintf(&b, "Cwd:          %s\n", cwd)
 	}
-
 	if t.BundlePath != "" {
-		detail += fmt.Sprintf("Bundle:       %s\n", t.BundlePath)
+		fmt.Fprintf(&b, "Bundle:       %s\n", t.BundlePath)
 	}
-
 	if cgroups := ctr.ProcessCgroup(p.Pid); len(cgroups) > 0 {
-		first := true
-		for _, cg := range cgroups {
-			if first {
-				detail += fmt.Sprintf("Cgroup:       %s\n", cg)
-				first = false
+		for i, cg := range cgroups {
+			if i == 0 {
+				fmt.Fprintf(&b, "Cgroup:       %s\n", cg)
 			} else {
-				detail += fmt.Sprintf("              %s\n", cg)
+				fmt.Fprintf(&b, "              %s\n", cg)
 			}
 		}
 	}
-
 	if namespaces := ctr.ProcessNamespaces(p.Pid); len(namespaces) > 0 {
 		first := true
 		for _, target := range namespaces {
 			if first {
-				detail += fmt.Sprintf("Namespaces:   %s\n", target)
+				fmt.Fprintf(&b, "Namespaces:   %s\n", target)
 				first = false
 			} else {
-				detail += fmt.Sprintf("              %s\n", target)
+				fmt.Fprintf(&b, "              %s\n", target)
 			}
 		}
 	}
-
-	return taskID(t), detail
+	return taskID(t), b.String()
 }
 
 func (taskKind) CrossRefs(data any, _ map[string]bool) []string {
