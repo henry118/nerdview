@@ -22,18 +22,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/henry118/nerdview/ui"
-)
-
-// Tree display characters for hierarchical views.
-const (
-	IconFolded   = "▸ "
-	IconUnfolded = "▾ "
-	ConnMid      = "├─ " // Non-last sibling connector.
-	ConnLast     = "└─ " // Last sibling connector.
-	ConnPipe     = "│  " // Vertical line for ongoing siblings above.
-	ConnBlank    = "   " // Blank indent (no more siblings above).
 )
 
 // FormatBytes formats a byte count into a human-readable string (B/K/M/G).
@@ -89,12 +78,12 @@ type Kind interface {
 // Tab wraps a table model with its Kind, raw data, and fold state.
 // It manages the lifecycle of rendering rows, column sizing, and fold operations.
 type Tab struct {
-	Kind      Kind
-	Table     table.Model
-	RawData   any
-	Folded    map[string]bool
-	crossRefs []string
-	width     int
+	Kind      Kind            // Resource type defining how data is rendered.
+	Table     table.Model     // Underlying bubbletea table component.
+	RawData   any             // Raw data slice (type-asserted by Kind methods).
+	Folded    map[string]bool // Fold state keyed by fold key; true means collapsed.
+	crossRefs []string        // Cached cross-references for navigation.
+	width     int             // Current terminal width for column sizing.
 }
 
 // NewTab creates a Tab for the given Kind with initial dimensions.
@@ -108,10 +97,7 @@ func NewTab(kind Kind, width, height int) Tab {
 		table.WithWidth(width),
 	)
 	s := table.DefaultStyles()
-	s.Selected = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color(ui.ColorBase)).
-		Background(lipgloss.Color(ui.ColorTeal))
+	s.Selected = ui.StyleTableSelected
 	t.SetStyles(s)
 
 	return Tab{

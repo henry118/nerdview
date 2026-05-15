@@ -105,27 +105,33 @@ type testKind struct {
 }
 
 func (k testKind) Name() string { return "Test" }
+
 func (k testKind) Columns() []Column {
 	return []Column{{Title: "Name", MinWidth: 10, Flex: true}}
 }
+
 func (k testKind) Rows(data any, folded map[string]bool) []table.Row {
 	return k.toRows(data, folded)
 }
+
 func (k testKind) FoldKey(data any, folded map[string]bool, index int) string {
 	if k.foldKey == nil {
 		return ""
 	}
 	return k.foldKey(data, folded, index)
 }
+
 func (k testKind) InitFolded(data any) map[string]bool {
 	if k.initFolded == nil {
 		return nil
 	}
 	return k.initFolded(data)
 }
+
 func (k testKind) Detail(_ any, _ map[string]bool, _ int) (string, string) {
 	return "", ""
 }
+
 func (k testKind) CrossRefs(_ any, _ map[string]bool) []string {
 	return nil
 }

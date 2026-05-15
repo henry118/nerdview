@@ -22,24 +22,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	dialogBoxStyle = lipgloss.NewStyle().
-			BorderStyle(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color(ColorMauve)).
-			Padding(0, 1)
-
-	dialogTitleBarStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(ColorBase)).
-				Background(lipgloss.Color(ColorMauve)).
-				Padding(0, 1).
-				Align(lipgloss.Center)
-
-	dialogFooterStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorOverlay0)).
-				Align(lipgloss.Right)
-)
-
 // DialogModel is a scrollable overlay dialog for displaying resource details.
 type DialogModel struct {
 	Title    string
@@ -112,13 +94,11 @@ func (d DialogModel) Update(msg tea.Msg) (DialogModel, tea.Cmd) {
 }
 
 func (d DialogModel) View() string {
-	titleBar := dialogTitleBarStyle.Width(d.width).Render(d.Title)
-	separator := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(ColorMauve)).
-		Render(strings.Repeat("─", d.width))
+	titleBar := StyleDialogTitleBar.Width(d.width).Render(d.Title)
+	separator := StyleDialogSeparator.Render(strings.Repeat("─", d.width))
 	content := d.viewport.View()
-	footer := dialogFooterStyle.Width(d.width).Render("Esc: close │ j/k: scroll")
+	footer := StyleDialogFooter.Width(d.width).Render("Esc: close │ j/k: scroll")
 
 	inner := lipgloss.JoinVertical(lipgloss.Left, titleBar, separator, content, separator, footer)
-	return dialogBoxStyle.Render(inner)
+	return StyleDialogBox.Render(inner)
 }

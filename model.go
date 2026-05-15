@@ -32,8 +32,10 @@ import (
 	"github.com/henry118/nerdview/ui"
 )
 
+// maxEvents caps the number of events retained in the events tab.
 const maxEvents = 200
 
+// Tab indices matching the order in newModel().
 const (
 	tabImages     = 0
 	tabSnapshots  = 1
@@ -42,41 +44,45 @@ const (
 	tabEvents     = 4
 )
 
+// viewMode tracks which UI overlay is active.
 type viewMode int
 
 const (
-	modeNormal viewMode = iota
-	modeDialog
-	modeNSSelect
-	modeSnapshotterSelect
+	modeNormal            viewMode = iota // Default table navigation.
+	modeDialog                            // Detail popup is open.
+	modeNSSelect                          // Namespace selector overlay.
+	modeSnapshotterSelect                 // Snapshotter selector overlay.
 )
 
+// navState stores the position before a cross-tab navigation for "go back".
 type navState struct {
 	tabIndex int
 	cursor   int
 }
 
+// model is the top-level bubbletea model for the TUI.
 type model struct {
-	client       *ctr.Client
-	namespaces   []string
-	activeNS     int
-	snapshotter  string
-	snapshotters []string
-	snCursor     int
-	resources    []*resource.Tab
-	activeRes    int
-	events       []resource.Event
-	dialog       ui.DialogModel
-	mode         viewMode
-	nsCursor     int
-	daemonPID    int
-	daemonStats  ctr.DaemonStats
-	navHistory   []navState
-	width        int
-	height       int
-	err          error
+	client       *ctr.Client      // Containerd gRPC client.
+	namespaces   []string         // Available namespaces.
+	activeNS     int              // Index into namespaces.
+	snapshotter  string           // Active snapshotter name.
+	snapshotters []string         // Available snapshotters.
+	snCursor     int              // Cursor for snapshotter selector.
+	resources    []*resource.Tab  // One tab per resource type.
+	activeRes    int              // Index of the active tab.
+	events       []resource.Event // Buffered events for the events tab.
+	dialog       ui.DialogModel   // Detail/spec popup.
+	mode         viewMode         // Current UI mode.
+	nsCursor     int              // Cursor for namespace selector.
+	daemonPID    int              // Containerd daemon PID.
+	daemonStats  ctr.DaemonStats  // Latest daemon resource stats.
+	navHistory   []navState       // Stack for cross-tab back navigation.
+	width        int              // Terminal width.
+	height       int              // Terminal height.
+	err          error            // Last error to display in status bar.
 }
 
+// newModel creates the initial model with default state.
 func newModel(client *ctr.Client, namespace string) model {
 	return model{
 		client:      client,
@@ -93,6 +99,7 @@ func newModel(client *ctr.Client, namespace string) model {
 	}
 }
 
+// Init starts background data loading, event subscription, and periodic refresh.
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		loadNamespaces(m.client),
@@ -105,6 +112,7 @@ func (m model) Init() tea.Cmd {
 	)
 }
 
+// Update handles all incoming messages (events, key presses, data loads).
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -213,6 +221,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleKey dispatches key events to the active mode handler.
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.mode {
 	case modeDialog:
@@ -226,6 +235,7 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// handleDialogKey handles keys when the detail popup is open.
 func (m model) handleDialogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
@@ -238,6 +248,7 @@ func (m model) handleDialogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// handleNSSelectKey handles keys in the namespace selector overlay.
 func (m model) handleNSSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
@@ -264,6 +275,7 @@ func (m model) handleNSSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleSnapshotterSelectKey handles keys in the snapshotter selector overlay.
 func (m model) handleSnapshotterSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
@@ -288,6 +300,7 @@ func (m model) handleSnapshotterSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleNormalKey handles keys in the default table navigation mode.
 func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit), key.Matches(msg, keys.Escape):
@@ -398,6 +411,7 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// View renders the full TUI frame.
 func (m model) View() string {
 	if m.width == 0 {
 		return "Loading..."
@@ -407,23 +421,22 @@ func (m model) View() string {
 	statsBar := m.renderStatsBar()
 	statsWidth := lipgloss.Width(statsBar)
 	if m.width > statsWidth {
-		statsBar += styleStatsLabel.Render(strings.Repeat(" ", m.width-statsWidth))
+		statsBar += ui.StyleStatsLabel.Render(strings.Repeat(" ", m.width-statsWidth))
 	}
 
 	// Tab bar: resource tabs
 	var tabs []string
 	for i, tab := range m.resources {
 		if i == m.activeRes {
-			tabs = append(tabs, styleTabActive.Render(tab.Kind.Name()))
+			tabs = append(tabs, ui.StyleTabActive.Render(tab.Kind.Name()))
 		} else {
-			tabs = append(tabs, styleTabInactive.Render(tab.Kind.Name()))
+			tabs = append(tabs, ui.StyleTabInactive.Render(tab.Kind.Name()))
 		}
 	}
 	tabBar := strings.Join(tabs, "")
 	tabBarWidth := lipgloss.Width(tabBar)
 	if m.width > tabBarWidth {
-		tabBar += styleTabInactive.Background(lipgloss.Color(ui.ColorBase)).Render(
-			strings.Repeat(" ", m.width-tabBarWidth))
+		tabBar += ui.StyleTabBarFill.Render(strings.Repeat(" ", m.width-tabBarWidth))
 	}
 
 	// Table
@@ -458,7 +471,7 @@ func (m model) View() string {
 	if m.err != nil {
 		errText := fmt.Sprintf(" ERROR: %s ", m.err.Error())
 		errPad := strings.Repeat(" ", max(0, m.width-len(errText)))
-		helpBar = styleError.Render(errText + errPad)
+		helpBar = ui.StyleError.Render(errText + errPad)
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left, statsBar, tabBar, tableView, helpBar)
@@ -485,18 +498,19 @@ func (m model) View() string {
 	return content
 }
 
+// overlaySelector renders a centered selector popup for namespaces or snapshotters.
 func (m model) overlaySelector(title string, items []string, cursor int) string {
-	titleLine := styleNSListTitle.Render(" " + title + " ")
+	titleLine := ui.StyleNSListTitle.Render(" " + title + " ")
 	var lines []string
 	for i, item := range items {
 		if i == cursor {
-			lines = append(lines, styleNSListSelected.Render("> "+item))
+			lines = append(lines, ui.StyleNSListSelected.Render("> "+item))
 		} else {
-			lines = append(lines, styleNSListItem.Render("  "+item))
+			lines = append(lines, ui.StyleNSListItem.Render("  "+item))
 		}
 	}
 	list := strings.Join(lines, "\n")
-	box := styleNSList.Render(lipgloss.JoinVertical(lipgloss.Left, titleLine, list))
+	box := ui.StyleNSList.Render(lipgloss.JoinVertical(lipgloss.Left, titleLine, list))
 
 	return lipgloss.Place(
 		m.width, m.height,
@@ -506,21 +520,23 @@ func (m model) overlaySelector(title string, items []string, cursor int) string 
 	)
 }
 
+// renderStatsBar renders the namespace and daemon stats line.
 func (m model) renderStatsBar() string {
-	ns := styleStatsLabel.Render(" ns:") + styleHeaderNS.Render(m.namespaces[m.activeNS])
+	ns := ui.StyleStatsLabel.Render(" ns:") + ui.StyleHeaderNS.Render(m.namespaces[m.activeNS])
 	s := m.daemonStats
 	if s.PID == 0 {
 		return ns
 	}
-	pid := styleStatsLabel.Render("  pid:") + styleStatsPID.Render(fmt.Sprintf("%d", s.PID))
-	cpu := styleStatsLabel.Render(" cpu:") + styleStatsCPU.Render(fmt.Sprintf("%.1f%%", s.CPUPct))
-	vms := styleStatsLabel.Render(" vms:") + styleStatsVMS.Render(resource.FormatBytes(s.VMS))
-	rss := styleStatsLabel.Render(" rss:") + styleStatsRSS.Render(resource.FormatBytes(s.RSS))
-	threads := styleStatsLabel.Render(" threads:") + styleStatsThreads.Render(fmt.Sprintf("%d", s.Threads))
-	up := styleStatsLabel.Render(" up:") + styleStatsUptime.Render(formatDuration(s.Uptime))
+	pid := ui.StyleStatsLabel.Render("  pid:") + ui.StyleStatsPID.Render(fmt.Sprintf("%d", s.PID))
+	cpu := ui.StyleStatsLabel.Render(" cpu:") + ui.StyleStatsCPU.Render(fmt.Sprintf("%.1f%%", s.CPUPct))
+	vms := ui.StyleStatsLabel.Render(" vms:") + ui.StyleStatsVMS.Render(resource.FormatBytes(s.VMS))
+	rss := ui.StyleStatsLabel.Render(" rss:") + ui.StyleStatsRSS.Render(resource.FormatBytes(s.RSS))
+	threads := ui.StyleStatsLabel.Render(" threads:") + ui.StyleStatsThreads.Render(fmt.Sprintf("%d", s.Threads))
+	up := ui.StyleStatsLabel.Render(" up:") + ui.StyleStatsUptime.Render(formatDuration(s.Uptime))
 	return ns + pid + cpu + vms + rss + threads + up
 }
 
+// formatDuration formats a duration into a compact "Xd Xh Xm" string.
 func formatDuration(d time.Duration) string {
 	totalMins := int(d.Minutes())
 	days := totalMins / 1440
@@ -535,6 +551,7 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dm", mins)
 }
 
+// loadSnapshotters fetches available snapshotters from the daemon.
 func loadSnapshotters(client *ctr.Client) tea.Cmd {
 	return func() tea.Msg {
 		sns, err := client.Snapshotters(context.Background())
@@ -545,6 +562,7 @@ func loadSnapshotters(client *ctr.Client) tea.Cmd {
 	}
 }
 
+// loadNamespaces fetches available namespaces from the daemon.
 func loadNamespaces(client *ctr.Client) tea.Cmd {
 	return func() tea.Msg {
 		ns, err := client.Namespaces(context.Background())
@@ -555,6 +573,7 @@ func loadNamespaces(client *ctr.Client) tea.Cmd {
 	}
 }
 
+// loadResources fetches all resource data for the active namespace.
 func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -589,6 +608,7 @@ type containersRefreshedMsg []ctr.ContainerInfo
 type tasksRefreshedMsg []ctr.TaskInfo
 type snapshotsRefreshedMsg []snapshots.Info
 
+// refreshResource reloads a single resource type based on an event topic.
 func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -623,18 +643,21 @@ func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd 
 	}
 }
 
+// tickCmd triggers a full data refresh every 30 seconds.
 func tickCmd() tea.Cmd {
 	return tea.Tick(30*time.Second, func(time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
 
+// statsTickCmd triggers a daemon stats refresh every 2 seconds.
 func statsTickCmd() tea.Cmd {
 	return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
 		return statsTickMsg{}
 	})
 }
 
+// initDaemonStats fetches the initial daemon PID and stats.
 func initDaemonStats(client *ctr.Client) tea.Cmd {
 	return func() tea.Msg {
 		pid, err := client.DaemonPID()
@@ -649,6 +672,7 @@ func initDaemonStats(client *ctr.Client) tea.Cmd {
 	}
 }
 
+// refreshDaemonStats updates daemon resource usage metrics.
 func refreshDaemonStats(client *ctr.Client, pid int) tea.Cmd {
 	return func() tea.Msg {
 		if pid == 0 {
