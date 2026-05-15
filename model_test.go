@@ -15,12 +15,18 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	tasktypes "github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/henry118/nerdview/ctr"
 	"github.com/henry118/nerdview/resource"
+	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func testModel() model {
@@ -29,13 +35,197 @@ func testModel() model {
 		activeNS:   0,
 		resources: []*resource.Tab{
 			ptab(resource.NewTab(resource.ImageKind, 80, 10)),
+			ptab(resource.NewTab(resource.SnapshotKind, 80, 10)),
 			ptab(resource.NewTab(resource.ContainerKind, 80, 10)),
 			ptab(resource.NewTab(resource.TaskKind, 80, 10)),
-			ptab(resource.NewTab(resource.SnapshotKind, 80, 10)),
 			ptab(resource.NewTab(resource.EventKind, 80, 10)),
 		},
 	}
 	return m
+}
+
+func TestGoToContainerToSnapshot(t *testing.T) {
+	m := testModel()
+	m.width = 200
+	m.height = 24
+	for _, tab := range m.resources {
+		tab.SetWidth(m.width)
+		tab.Table.SetHeight(20)
+	}
+
+	snapshotKey := "sha256:7a75083e5b5a8d593efe8917fe730ab29cd8a8e8a5dfc2fcea022ab5a20954e0"
+
+	// Load a container with a snapshot key
+	containers := []ctr.ContainerInfo{
+		{
+			Container: containers.Container{
+				ID:          "test-container",
+				Image:       "nginx:latest",
+				Runtime:     containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
+				CreatedAt:   time.Now(),
+				SnapshotKey: snapshotKey,
+			},
+			IsSandbox: false,
+		},
+	}
+	m.resources[tabContainers].UpdateData(containers)
+
+	// Load snapshots including one matching the key
+	snaps := []snapshots.Info{
+		{Name: snapshotKey, Kind: snapshots.KindActive, Created: time.Now()},
+	}
+	m.resources[tabSnapshots].UpdateData(snaps)
+
+	// Navigate to containers tab and press GoTo
+	m.activeRes = tabContainers
+	m.resources[tabContainers].Table.Focus()
+
+	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	newModel, _ := m.Update(goToKey)
+	m = newModel.(model)
+
+	if m.activeRes != tabSnapshots {
+		t.Fatalf("Expected to jump to snapshots tab (%d), got %d", tabSnapshots, m.activeRes)
+	}
+
+	// Verify cursor landed on the matching snapshot row
+	rows := m.resources[tabSnapshots].Table.Rows()
+	cursor := m.resources[tabSnapshots].Table.Cursor()
+	if cursor >= len(rows) {
+		t.Fatalf("Cursor %d out of range (rows=%d)", cursor, len(rows))
+	}
+	// The displayed name should contain the short digest
+	shortKey := resource.ShortDigest(snapshotKey)
+	if !strings.Contains(rows[cursor][0], shortKey) {
+		t.Errorf("Cursor row = %q, does not contain short key %q", rows[cursor][0], shortKey)
+	}
+
+	// GoBack should return to containers tab
+	backKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}}
+	newModel, _ = m.Update(backKey)
+	m = newModel.(model)
+
+	if m.activeRes != tabContainers {
+		t.Errorf("Expected to return to containers tab (%d), got %d", tabContainers, m.activeRes)
+	}
+}
+
+func TestGoToTaskToContainer(t *testing.T) {
+	m := testModel()
+	m.width = 200
+	m.height = 24
+	for _, tab := range m.resources {
+		tab.SetWidth(m.width)
+		tab.Table.SetHeight(20)
+	}
+
+	containerID := "7a75083e5b5a8d593efe8917fe730ab29cd8a8e8a5dfc2fcea022ab5a20954e0"
+
+	ctrs := []ctr.ContainerInfo{
+		{
+			Container: containers.Container{
+				ID:        containerID,
+				Image:     "nginx:latest",
+				Runtime:   containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
+				CreatedAt: time.Now(),
+			},
+		},
+	}
+	m.resources[tabContainers].UpdateData(ctrs)
+
+	tasks := []ctr.TaskInfo{
+		{
+			ContainerID: containerID,
+			Process:     &tasktypes.Process{ID: containerID, Pid: 1234, Status: tasktypes.Status_RUNNING},
+		},
+	}
+	m.resources[tabTasks].UpdateData(tasks)
+
+	m.activeRes = tabTasks
+	m.resources[tabTasks].Table.Focus()
+
+	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	newModel, _ := m.Update(goToKey)
+	m = newModel.(model)
+
+	if m.activeRes != tabContainers {
+		t.Fatalf("Expected to jump to containers tab (%d), got %d", tabContainers, m.activeRes)
+	}
+
+	rows := m.resources[tabContainers].Table.Rows()
+	cursor := m.resources[tabContainers].Table.Cursor()
+	if cursor >= len(rows) {
+		t.Fatalf("Cursor %d out of range (rows=%d)", cursor, len(rows))
+	}
+	if !strings.Contains(rows[cursor][0], containerID) {
+		t.Errorf("Cursor row = %q, does not contain container ID", rows[cursor][0])
+	}
+
+	// GoBack
+	backKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}}
+	newModel, _ = m.Update(backKey)
+	m = newModel.(model)
+	if m.activeRes != tabTasks {
+		t.Errorf("Expected to return to tasks tab (%d), got %d", tabTasks, m.activeRes)
+	}
+}
+
+func TestGoToImageToSnapshot(t *testing.T) {
+	m := testModel()
+	m.width = 200
+	m.height = 24
+	for _, tab := range m.resources {
+		tab.SetWidth(m.width)
+		tab.Table.SetHeight(20)
+	}
+
+	snapshotKey := "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+
+	images := []ctr.ImageTree{
+		{
+			Name:        "docker.io/library/nginx:latest",
+			Desc:        ocispec.Descriptor{MediaType: "application/vnd.oci.image.manifest.v1+json", Digest: digest.FromString("nginx"), Size: 1024},
+			SnapshotKey: snapshotKey,
+			Children: []ctr.ImageTree{
+				{Desc: ocispec.Descriptor{MediaType: "application/vnd.oci.image.config.v1+json", Digest: digest.FromString("config"), Size: 512}},
+			},
+		},
+	}
+	m.resources[tabImages].UpdateData(images)
+
+	snaps := []snapshots.Info{
+		{Name: snapshotKey, Kind: snapshots.KindCommitted, Created: time.Now()},
+	}
+	m.resources[tabSnapshots].UpdateData(snaps)
+
+	m.activeRes = tabImages
+	m.resources[tabImages].Table.Focus()
+
+	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	newModel, _ := m.Update(goToKey)
+	m = newModel.(model)
+
+	if m.activeRes != tabSnapshots {
+		t.Fatalf("Expected to jump to snapshots tab (%d), got %d", tabSnapshots, m.activeRes)
+	}
+
+	rows := m.resources[tabSnapshots].Table.Rows()
+	cursor := m.resources[tabSnapshots].Table.Cursor()
+	if cursor >= len(rows) {
+		t.Fatalf("Cursor %d out of range (rows=%d)", cursor, len(rows))
+	}
+	shortKey := resource.ShortDigest(snapshotKey)
+	if !strings.Contains(rows[cursor][0], shortKey) {
+		t.Errorf("Cursor row = %q, does not contain short key %q", rows[cursor][0], shortKey)
+	}
+
+	// GoBack
+	backKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}}
+	newModel, _ = m.Update(backKey)
+	m = newModel.(model)
+	if m.activeRes != tabImages {
+		t.Errorf("Expected to return to images tab (%d), got %d", tabImages, m.activeRes)
+	}
 }
 
 func TestEventsFilteredByNamespace(t *testing.T) {

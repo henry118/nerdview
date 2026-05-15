@@ -353,9 +353,10 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.resources[m.activeRes].Table.Blur()
 			m.activeRes = targetTab
 			m.resources[m.activeRes].Table.Focus()
+			shortKey := resource.ShortDigest(targetKey)
 			rows := m.resources[m.activeRes].Table.Rows()
 			for i, row := range rows {
-				if len(row) > 0 && strings.Contains(row[0], targetKey) {
+				if len(row) > 0 && strings.Contains(row[0], shortKey) {
 					m.resources[m.activeRes].Table.SetCursor(i)
 					break
 				}
