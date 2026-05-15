@@ -19,10 +19,12 @@ import (
 	"github.com/henry118/nerdview/ctr"
 )
 
+// namespacesLoadedMsg is sent when the namespace list is fetched from the daemon.
 type namespacesLoadedMsg struct {
 	namespaces []string
 }
 
+// resourcesLoadedMsg is sent when all resources for a namespace are loaded.
 type resourcesLoadedMsg struct {
 	namespace  string
 	images     []ctr.ImageTree
@@ -31,17 +33,35 @@ type resourcesLoadedMsg struct {
 	snapshots  []snapshots.Info
 }
 
+// snapshottersLoadedMsg is sent when available snapshotters are fetched.
 type snapshottersLoadedMsg struct {
 	snapshotters []string
 }
 
+// daemonStatsMsg carries updated daemon resource usage metrics.
 type daemonStatsMsg struct {
 	stats ctr.DaemonStats
 }
 
+// errorMsg carries an error to display in the status bar.
 type errorMsg struct {
 	err error
 }
 
+// tickMsg triggers a periodic full data refresh.
 type tickMsg struct{}
+
+// statsTickMsg triggers a periodic daemon stats refresh.
 type statsTickMsg struct{}
+
+// imagesRefreshedMsg is sent when images are reloaded due to a containerd event.
+type imagesRefreshedMsg []ctr.ImageTree
+
+// snapshotsRefreshedMsg is sent when snapshots are reloaded due to a containerd event.
+type snapshotsRefreshedMsg []snapshots.Info
+
+// containersRefreshedMsg is sent when containers are reloaded due to a containerd event.
+type containersRefreshedMsg []ctr.ContainerInfo
+
+// tasksRefreshedMsg is sent when tasks are reloaded due to a containerd event.
+type tasksRefreshedMsg []ctr.TaskInfo
