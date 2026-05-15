@@ -303,3 +303,89 @@ func TestImageKindToRows_SizeShowsTotal(t *testing.T) {
 		t.Errorf("Config size = %q, want %q", configSize, "1000B")
 	}
 }
+
+func TestImagesSortedByDigest(t *testing.T) {
+	digestA := digest.FromString("aaa")
+	digestB := digest.FromString("bbb")
+
+	// Input in arbitrary order
+	data := []ctr.ImageTree{
+		{
+			Name: "image-b",
+			Desc: ocispec.Descriptor{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    digestB,
+				Size:      100,
+			},
+		},
+		{
+			Name: "image-a",
+			Desc: ocispec.Descriptor{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    digestA,
+				Size:      200,
+			},
+		},
+	}
+
+	rows := ImageKind.ToRows(data, nil)
+	if len(rows) != 2 {
+		t.Fatalf("Expected 2 rows, got %d", len(rows))
+	}
+
+	// Rows should be sorted by digest (column 2)
+	if rows[0][2] > rows[1][2] {
+		t.Errorf("Rows not sorted by digest: %q > %q", rows[0][2], rows[1][2])
+	}
+}
+
+func TestImagesDuplicateDigestAdjacent(t *testing.T) {
+	sharedDigest := digest.FromString("shared")
+	otherDigest := digest.FromString("other")
+
+	data := []ctr.ImageTree{
+		{
+			Name: "myapp:latest",
+			Desc: ocispec.Descriptor{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    sharedDigest,
+				Size:      100,
+			},
+		},
+		{
+			Name: "unrelated:v1",
+			Desc: ocispec.Descriptor{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    otherDigest,
+				Size:      300,
+			},
+		},
+		{
+			Name: "myapp@sha256:" + sharedDigest.Encoded(),
+			Desc: ocispec.Descriptor{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    sharedDigest,
+				Size:      100,
+			},
+		},
+	}
+
+	rows := ImageKind.ToRows(data, nil)
+
+	// Find positions of the two shared-digest rows
+	var sharedPositions []int
+	shortShared := ShortDigest(sharedDigest.String())
+	for i, row := range rows {
+		if len(row) > 2 && row[2] == shortShared {
+			sharedPositions = append(sharedPositions, i)
+		}
+	}
+
+	if len(sharedPositions) != 2 {
+		t.Fatalf("Expected 2 rows with shared digest, got %d", len(sharedPositions))
+	}
+
+	if sharedPositions[1]-sharedPositions[0] != 1 {
+		t.Errorf("Shared digest rows at positions %v are not adjacent", sharedPositions)
+	}
+}
