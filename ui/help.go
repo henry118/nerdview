@@ -45,18 +45,22 @@ type helpConfig struct {
 	position  string
 }
 
+// WithGoTo shows the "go to" hint with the given target label (e.g. "sn", "ctr").
 func WithGoTo(label string) HelpOption {
 	return func(c *helpConfig) { c.goToLabel = label }
 }
 
+// WithBack shows the "back" navigation hint.
 func WithBack() HelpOption {
 	return func(c *helpConfig) { c.showBack = true }
 }
 
+// WithSpec shows the "spec" hint for viewing runtime specs.
 func WithSpec() HelpOption {
 	return func(c *helpConfig) { c.showSpec = true }
 }
 
+// WithPosition shows a right-aligned row position indicator (e.g. "3/47").
 func WithPosition(pos string) HelpOption {
 	return func(c *helpConfig) { c.position = pos }
 }

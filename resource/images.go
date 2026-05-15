@@ -52,75 +52,31 @@ var imageTreeSpec = TreeSpec[ctr.ImageTree]{
 	},
 }
 
-var ImageKind = Kind{
-	Name: "Images",
-	Columns: []Column{
+type imageKind struct{}
+
+var ImageKind Kind = imageKind{}
+
+func (imageKind) Name() string { return "Images" }
+
+func (imageKind) Columns() []Column {
+	return []Column{
 		{Title: "Name", MinWidth: 20, Flex: true},
 		{Title: "Type", MinWidth: 12},
 		{Title: "Digest", MinWidth: 20},
 		{Title: "Layers", MinWidth: 6},
 		{Title: "Size", MinWidth: 10},
-	},
-	ToRows: func(data any, folded map[string]bool) []table.Row {
-		trees := toSortedImages(data)
-		if trees == nil {
-			return nil
-		}
-		return BuildTree(imageTreeSpec, trees, folded).Rows
-	},
-	RowID: func(data any, folded map[string]bool, index int) string {
-		trees := toSortedImages(data)
-		if trees == nil || index < 0 {
-			return ""
-		}
-		result := BuildTree(imageTreeSpec, trees, folded)
-		if index >= len(result.Nodes) {
-			return ""
-		}
-		node := result.Nodes[index]
-		if node.HasChildren {
-			return node.ID
-		}
-		return ""
-	},
-	InitFolded: func(data any) map[string]bool {
-		trees := toSortedImages(data)
-		if trees == nil {
-			return nil
-		}
-		folded := make(map[string]bool)
-		DefaultFoldState(imageTreeSpec, trees, folded)
-		return folded
-	},
-	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
-		trees := toSortedImages(data)
-		if trees == nil || index < 0 {
-			return "", ""
-		}
-		result := BuildTree(imageTreeSpec, trees, folded)
-		if index >= len(result.Nodes) {
-			return "", ""
-		}
-		return formatImageDetail(result.Nodes[index].Item)
-	},
-	GoToRefs: func(data any, folded map[string]bool) []string {
-		trees := toSortedImages(data)
-		if trees == nil {
-			return nil
-		}
-		result := BuildTree(imageTreeSpec, trees, folded)
-		refs := make([]string, len(result.Nodes))
-		for i, node := range result.Nodes {
-			if node.HasChildren {
-				refs[i] = node.Item.SnapshotKey
-			}
-		}
-		return refs
-	},
+	}
 }
 
-// ImageSnapshotRef returns the snapshot key for the image row at the given index.
-func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
+func (imageKind) Rows(data any, folded map[string]bool) []table.Row {
+	trees := toSortedImages(data)
+	if trees == nil {
+		return nil
+	}
+	return BuildTree(imageTreeSpec, trees, folded).Rows
+}
+
+func (imageKind) FoldKey(data any, folded map[string]bool, index int) string {
 	trees := toSortedImages(data)
 	if trees == nil || index < 0 {
 		return ""
@@ -130,10 +86,47 @@ func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
 		return ""
 	}
 	node := result.Nodes[index]
-	if !node.HasChildren {
-		return ""
+	if node.HasChildren {
+		return node.ID
 	}
-	return node.Item.SnapshotKey
+	return ""
+}
+
+func (imageKind) InitFolded(data any) map[string]bool {
+	trees := toSortedImages(data)
+	if trees == nil {
+		return nil
+	}
+	folded := make(map[string]bool)
+	DefaultFoldState(imageTreeSpec, trees, folded)
+	return folded
+}
+
+func (imageKind) Detail(data any, folded map[string]bool, index int) (string, string) {
+	trees := toSortedImages(data)
+	if trees == nil || index < 0 {
+		return "", ""
+	}
+	result := BuildTree(imageTreeSpec, trees, folded)
+	if index >= len(result.Nodes) {
+		return "", ""
+	}
+	return formatImageDetail(result.Nodes[index].Item)
+}
+
+func (imageKind) CrossRefs(data any, folded map[string]bool) []string {
+	trees := toSortedImages(data)
+	if trees == nil {
+		return nil
+	}
+	result := BuildTree(imageTreeSpec, trees, folded)
+	refs := make([]string, len(result.Nodes))
+	for i, node := range result.Nodes {
+		if node.HasChildren {
+			refs[i] = node.Item.SnapshotKey
+		}
+	}
+	return refs
 }
 
 func toSortedImages(data any) []ctr.ImageTree {

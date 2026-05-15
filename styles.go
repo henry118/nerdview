@@ -80,8 +80,8 @@ var (
 				Padding(0, 1)
 
 	styleNSListItem = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ui.ColorText)).
-				Padding(0, 1)
+			Foreground(lipgloss.Color(ui.ColorText)).
+			Padding(0, 1)
 
 	styleNSListSelected = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(ui.ColorBase)).

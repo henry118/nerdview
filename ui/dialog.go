@@ -95,21 +95,9 @@ func (d *DialogModel) resize() {
 	maxW := d.termW - 6
 	maxH := d.termH - 8
 
-	w := contentWidth + 2
-	if w > maxW {
-		w = maxW
-	}
-	if w < 30 {
-		w = 30
-	}
+	w := max(min(contentWidth+2, maxW), 30)
 
-	h := contentHeight
-	if h > maxH {
-		h = maxH
-	}
-	if h < 3 {
-		h = 3
-	}
+	h := max(min(contentHeight, maxH), 3)
 
 	d.width = w
 	d.height = h

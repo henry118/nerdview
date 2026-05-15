@@ -27,7 +27,7 @@ func TestEventKindToRows(t *testing.T) {
 		{Timestamp: now.Add(time.Second), Namespace: "k8s.io", Topic: "/containers/delete"},
 	}
 
-	rows := EventKind.ToRows(data, nil)
+	rows := EventKind.Rows(data, nil)
 
 	if len(rows) != 2 {
 		t.Fatalf("Expected 2 rows, got %d", len(rows))
@@ -49,7 +49,7 @@ func TestEventKindToDetail(t *testing.T) {
 		{Timestamp: now, Namespace: "default", Topic: "/tasks/exit"},
 	}
 
-	title, body := EventKind.ToDetail(data, nil, 0)
+	title, body := EventKind.Detail(data, nil, 0)
 
 	if title != "/tasks/exit" {
 		t.Errorf("Title = %q, want %q", title, "/tasks/exit")
@@ -79,7 +79,7 @@ func TestEventKindToDetail_WithPayload(t *testing.T) {
 		},
 	}
 
-	_, body := EventKind.ToDetail(data, nil, 0)
+	_, body := EventKind.Detail(data, nil, 0)
 
 	if !strings.Contains(body, "--- Payload ---") {
 		t.Error("Body should contain payload section")
@@ -98,7 +98,7 @@ func TestEventKindToDetail_NilPayload(t *testing.T) {
 		{Timestamp: now, Namespace: "default", Topic: "/images/create", Payload: nil},
 	}
 
-	_, body := EventKind.ToDetail(data, nil, 0)
+	_, body := EventKind.Detail(data, nil, 0)
 
 	if strings.Contains(body, "Payload") {
 		t.Error("Body should NOT contain payload section when payload is nil")

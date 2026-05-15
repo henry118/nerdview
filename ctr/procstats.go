@@ -124,7 +124,7 @@ func ReadDaemonStats(pid int) (DaemonStats, error) {
 	if err != nil {
 		return stats, nil
 	}
-	for _, line := range strings.Split(string(statusData), "\n") {
+	for line := range strings.SplitSeq(string(statusData), "\n") {
 		if strings.HasPrefix(line, "VmSize:") {
 			stats.VMS = parseKBValue(line)
 		} else if strings.HasPrefix(line, "VmRSS:") {
@@ -175,7 +175,7 @@ func ProcessCgroup(pid uint32) []string {
 		return nil
 	}
 	var lines []string
-	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
 		if line != "" {
 			lines = append(lines, line)
 		}

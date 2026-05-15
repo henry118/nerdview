@@ -83,17 +83,15 @@ func newModel(client *ctr.Client, namespace string) model {
 		namespaces:  []string{namespace},
 		snapshotter: "overlayfs",
 		resources: []*resource.Tab{
-			ptab(resource.NewTab(resource.ImageKind, 80, 10)),
-			ptab(resource.NewTab(resource.SnapshotKind, 80, 10)),
-			ptab(resource.NewTab(resource.ContainerKind, 80, 10)),
-			ptab(resource.NewTab(resource.TaskKind, 80, 10)),
-			ptab(resource.NewTab(resource.EventKind, 80, 10)),
+			new(resource.NewTab(resource.ImageKind, 80, 10)),
+			new(resource.NewTab(resource.SnapshotKind, 80, 10)),
+			new(resource.NewTab(resource.ContainerKind, 80, 10)),
+			new(resource.NewTab(resource.TaskKind, 80, 10)),
+			new(resource.NewTab(resource.EventKind, 80, 10)),
 		},
 		dialog: ui.NewDialog(80, 24),
 	}
 }
-
-func ptab(t resource.Tab) *resource.Tab { return &t }
 
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
@@ -113,10 +111,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		// overhead: stats (1) + tab bar (1) + help bar (1) = 3
-		tableHeight := m.height - 3
-		if tableHeight < 3 {
-			tableHeight = 3
-		}
+		tableHeight := max(m.height-3, 3)
 		for _, tab := range m.resources {
 			tab.SetWidth(m.width)
 			tab.Table.SetHeight(tableHeight)
@@ -329,23 +324,17 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Right):
-		tab := m.resources[m.activeRes]
-		if tab.CanFold() {
-			tab.Unfold()
-		}
+		m.resources[m.activeRes].Unfold()
 		return m, nil
 
 	case key.Matches(msg, keys.Left):
-		tab := m.resources[m.activeRes]
-		if tab.CanFold() {
-			tab.Fold()
-		}
+		m.resources[m.activeRes].Fold()
 		return m, nil
 
 	case key.Matches(msg, keys.GoTo):
 		tab := m.resources[m.activeRes]
 		idx := tab.Table.Cursor()
-		targetKey := tab.GoToRef(idx)
+		targetKey := tab.CrossRef(idx)
 		var targetTab int
 		switch m.activeRes {
 		case tabImages, tabContainers:
@@ -425,9 +414,9 @@ func (m model) View() string {
 	var tabs []string
 	for i, tab := range m.resources {
 		if i == m.activeRes {
-			tabs = append(tabs, styleTabActive.Render(tab.Kind.Name))
+			tabs = append(tabs, styleTabActive.Render(tab.Kind.Name()))
 		} else {
-			tabs = append(tabs, styleTabInactive.Render(tab.Kind.Name))
+			tabs = append(tabs, styleTabInactive.Render(tab.Kind.Name()))
 		}
 	}
 	tabBar := strings.Join(tabs, "")
@@ -444,7 +433,7 @@ func (m model) View() string {
 	tab := m.resources[m.activeRes]
 	rowCount := len(tab.Table.Rows())
 	var goToLabel string
-	if tab.GoToRef(tab.Table.Cursor()) != "" {
+	if tab.CrossRef(tab.Table.Cursor()) != "" {
 		switch m.activeRes {
 		case tabImages, tabContainers:
 			goToLabel = "sn"
@@ -532,7 +521,6 @@ func (m model) renderStatsBar() string {
 	return ns + pid + cpu + vms + rss + threads + up
 }
 
-
 func formatDuration(d time.Duration) string {
 	totalMins := int(d.Minutes())
 	days := totalMins / 1440
@@ -578,7 +566,7 @@ func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 		if err != nil {
 			return errorMsg{err: err}
 		}
-		tasks, err := client.TasksWithSpec(ctx, ns)
+		tasks, err := client.Tasks(ctx, ns)
 		if err != nil {
 			return errorMsg{err: err}
 		}
@@ -618,7 +606,7 @@ func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd 
 			}
 			return containersRefreshedMsg(ctrs)
 		case strings.HasPrefix(topic, "/tasks/"):
-			tasks, err := client.TasksWithSpec(ctx, ns)
+			tasks, err := client.Tasks(ctx, ns)
 			if err != nil {
 				return errorMsg{err: err}
 			}

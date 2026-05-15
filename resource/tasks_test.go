@@ -23,26 +23,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestTaskContainerRef(t *testing.T) {
-	data := []ctr.TaskInfo{
-		{ContainerID: "container-1", Process: &tasktypes.Process{ID: "container-1", Pid: 1234, Status: tasktypes.Status_RUNNING}},
-		{ContainerID: "container-2", Process: &tasktypes.Process{ID: "container-2", Pid: 5678, Status: tasktypes.Status_STOPPED}},
-	}
-
-	if got := TaskContainerRef(data, nil, 0); got != "container-1" {
-		t.Errorf("TaskContainerRef(0) = %q, want %q", got, "container-1")
-	}
-	if got := TaskContainerRef(data, nil, 1); got != "container-2" {
-		t.Errorf("TaskContainerRef(1) = %q, want %q", got, "container-2")
-	}
-	if got := TaskContainerRef(data, nil, 99); got != "" {
-		t.Errorf("TaskContainerRef(99) = %q, want empty", got)
-	}
-	if got := TaskContainerRef(nil, nil, 0); got != "" {
-		t.Errorf("TaskContainerRef(nil) = %q, want empty", got)
-	}
-}
-
 func TestTaskKindToRows(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
@@ -65,7 +45,7 @@ func TestTaskKindToRows(t *testing.T) {
 		},
 	}
 
-	rows := TaskKind.ToRows(data, nil)
+	rows := TaskKind.Rows(data, nil)
 
 	if len(rows) != 2 {
 		t.Fatalf("Expected 2 rows, got %d", len(rows))
@@ -116,7 +96,7 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 		},
 	}
 
-	title, body := TaskKind.ToDetail(data, nil, 0)
+	title, body := TaskKind.Detail(data, nil, 0)
 
 	if title != "my-container" {
 		t.Errorf("Title = %q, want %q", title, "my-container")
@@ -148,7 +128,7 @@ func TestTaskKindToDetail_Exec(t *testing.T) {
 		},
 	}
 
-	title, body := TaskKind.ToDetail(data, nil, 0)
+	title, body := TaskKind.Detail(data, nil, 0)
 
 	if title != "my-exec" {
 		t.Errorf("Title = %q, want %q", title, "my-exec")
@@ -175,7 +155,7 @@ func TestTaskKindToDetail_Stopped(t *testing.T) {
 		},
 	}
 
-	_, body := TaskKind.ToDetail(data, nil, 0)
+	_, body := TaskKind.Detail(data, nil, 0)
 
 	if !strings.Contains(body, "Exit Status:  137") {
 		t.Error("Stopped task should show exit status")

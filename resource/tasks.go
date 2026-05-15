@@ -22,18 +22,14 @@ import (
 	"github.com/henry118/nerdview/ctr"
 )
 
-// TaskContainerRef returns the container ID for the task row at the given index.
-func TaskContainerRef(data any, _ map[string]bool, index int) string {
-	tasks, ok := data.([]ctr.TaskInfo)
-	if !ok || index < 0 || index >= len(tasks) {
-		return ""
-	}
-	return tasks[index].ContainerID
-}
+type taskKind struct{}
 
-var TaskKind = Kind{
-	Name: "Tasks",
-	Columns: []Column{
+var TaskKind Kind = taskKind{}
+
+func (taskKind) Name() string { return "Tasks" }
+
+func (taskKind) Columns() []Column {
+	return []Column{
 		{Title: "ID", MinWidth: 8, Flex: true},
 		{Title: "Container", MinWidth: 8, Flex: true},
 		{Title: "Type", MinWidth: 4},
@@ -41,112 +37,119 @@ var TaskKind = Kind{
 		{Title: "Status", MinWidth: 7},
 		{Title: "Cmdline", MinWidth: 10, Flex: true},
 		{Title: "Started", MinWidth: 19, Flex: true},
-	},
-	ToRows: func(data any, folded map[string]bool) []table.Row {
-		tasks, ok := data.([]ctr.TaskInfo)
-		if !ok || len(tasks) == 0 {
-			return nil
-		}
-		rows := make([]table.Row, len(tasks))
-		for i, t := range tasks {
-			id := t.ContainerID
-			typ := "init"
-			if t.ExecID != "" {
-				id = t.ExecID
-				typ = "exec"
-			}
-			rows[i] = table.Row{
-				id,
-				t.ContainerID,
-				typ,
-				fmt.Sprintf("%d", t.Process.Pid),
-				t.Process.Status.String(),
-				t.Cmdline,
-				t.StartedAt,
-			}
-		}
-		return rows
-	},
-	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
-		tasks, ok := data.([]ctr.TaskInfo)
-		if !ok || index < 0 || index >= len(tasks) {
-			return "", ""
-		}
-		t := tasks[index]
-		p := t.Process
+	}
+}
 
+func (taskKind) Rows(data any, _ map[string]bool) []table.Row {
+	tasks, ok := data.([]ctr.TaskInfo)
+	if !ok || len(tasks) == 0 {
+		return nil
+	}
+	rows := make([]table.Row, len(tasks))
+	for i, t := range tasks {
+		id := t.ContainerID
 		typ := "init"
 		if t.ExecID != "" {
+			id = t.ExecID
 			typ = "exec"
 		}
-
-		detail := fmt.Sprintf("ID:           %s\nContainer:    %s\nType:         %s\nPID:          %d\nStatus:       %s\n",
-			taskID(t), t.ContainerID, typ, p.Pid, p.Status)
-
-		if t.Cmdline != "" {
-			detail += fmt.Sprintf("Cmdline:      %s\n", t.Cmdline)
+		rows[i] = table.Row{
+			id,
+			t.ContainerID,
+			typ,
+			fmt.Sprintf("%d", t.Process.Pid),
+			t.Process.Status.String(),
+			t.Cmdline,
+			t.StartedAt,
 		}
+	}
+	return rows
+}
 
-		if t.StartedAt != "" {
-			detail += fmt.Sprintf("Started:      %s\n", t.StartedAt)
+func (taskKind) FoldKey(_ any, _ map[string]bool, _ int) string { return "" }
+
+func (taskKind) InitFolded(_ any) map[string]bool { return nil }
+
+func (taskKind) Detail(data any, _ map[string]bool, index int) (string, string) {
+	tasks, ok := data.([]ctr.TaskInfo)
+	if !ok || index < 0 || index >= len(tasks) {
+		return "", ""
+	}
+	t := tasks[index]
+	p := t.Process
+
+	typ := "init"
+	if t.ExecID != "" {
+		typ = "exec"
+	}
+
+	detail := fmt.Sprintf("ID:           %s\nContainer:    %s\nType:         %s\nPID:          %d\nStatus:       %s\n",
+		taskID(t), t.ContainerID, typ, p.Pid, p.Status)
+
+	if t.Cmdline != "" {
+		detail += fmt.Sprintf("Cmdline:      %s\n", t.Cmdline)
+	}
+
+	if t.StartedAt != "" {
+		detail += fmt.Sprintf("Started:      %s\n", t.StartedAt)
+	}
+
+	if p.Status == tasktypes.Status_STOPPED {
+		detail += fmt.Sprintf("Exit Status:  %d\n", p.ExitStatus)
+		if p.ExitedAt != nil {
+			detail += fmt.Sprintf("Exited At:    %s\n", p.ExitedAt.AsTime().Format("2006-01-02 15:04:05"))
 		}
+	}
 
-		if p.Status == tasktypes.Status_STOPPED {
-			detail += fmt.Sprintf("Exit Status:  %d\n", p.ExitStatus)
-			if p.ExitedAt != nil {
-				detail += fmt.Sprintf("Exited At:    %s\n", p.ExitedAt.AsTime().Format("2006-01-02 15:04:05"))
+	if root := ctr.ProcessRoot(p.Pid); root != "" {
+		detail += fmt.Sprintf("Root:         %s\n", root)
+	}
+
+	if cwd := ctr.ProcessCwd(p.Pid); cwd != "" {
+		detail += fmt.Sprintf("Cwd:          %s\n", cwd)
+	}
+
+	if t.BundlePath != "" {
+		detail += fmt.Sprintf("Bundle:       %s\n", t.BundlePath)
+	}
+
+	if cgroups := ctr.ProcessCgroup(p.Pid); len(cgroups) > 0 {
+		first := true
+		for _, cg := range cgroups {
+			if first {
+				detail += fmt.Sprintf("Cgroup:       %s\n", cg)
+				first = false
+			} else {
+				detail += fmt.Sprintf("              %s\n", cg)
 			}
 		}
+	}
 
-		if root := ctr.ProcessRoot(p.Pid); root != "" {
-			detail += fmt.Sprintf("Root:         %s\n", root)
-		}
-
-		if cwd := ctr.ProcessCwd(p.Pid); cwd != "" {
-			detail += fmt.Sprintf("Cwd:          %s\n", cwd)
-		}
-
-		if t.BundlePath != "" {
-			detail += fmt.Sprintf("Bundle:       %s\n", t.BundlePath)
-		}
-
-		if cgroups := ctr.ProcessCgroup(p.Pid); len(cgroups) > 0 {
-			first := true
-			for _, cg := range cgroups {
-				if first {
-					detail += fmt.Sprintf("Cgroup:       %s\n", cg)
-					first = false
-				} else {
-					detail += fmt.Sprintf("              %s\n", cg)
-				}
+	if namespaces := ctr.ProcessNamespaces(p.Pid); len(namespaces) > 0 {
+		first := true
+		for _, target := range namespaces {
+			if first {
+				detail += fmt.Sprintf("Namespaces:   %s\n", target)
+				first = false
+			} else {
+				detail += fmt.Sprintf("              %s\n", target)
 			}
 		}
+	}
 
-		if namespaces := ctr.ProcessNamespaces(p.Pid); len(namespaces) > 0 {
-			first := true
-			for _, target := range namespaces {
-				if first {
-					detail += fmt.Sprintf("Namespaces:   %s\n", target)
-					first = false
-				} else {
-					detail += fmt.Sprintf("              %s\n", target)
-				}
-			}
-		}
+	return taskID(t), detail
+}
 
-		return taskID(t), detail
-	},
-	GoToRefs: func(data any, _ map[string]bool) []string {
-		tasks, ok := data.([]ctr.TaskInfo)
-		if !ok {
-			return nil
-		}
-		refs := make([]string, len(tasks))
-		for i, t := range tasks {
-			refs[i] = t.ContainerID
-		}
-		return refs
-	},
+func (taskKind) CrossRefs(data any, _ map[string]bool) []string {
+	tasks, ok := data.([]ctr.TaskInfo)
+	if !ok {
+		return nil
+	}
+	refs := make([]string, len(tasks))
+	for i, t := range tasks {
+		refs[i] = t.ContainerID
+	}
+	return refs
 }
 
 func taskID(t ctr.TaskInfo) string {

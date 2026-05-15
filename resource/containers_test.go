@@ -93,7 +93,7 @@ func TestContainerTreeNodes(t *testing.T) {
 
 func TestContainerKindToRows_Unfolded(t *testing.T) {
 	data := testContainers()
-	rows := ContainerKind.ToRows(data, nil)
+	rows := ContainerKind.Rows(data, nil)
 
 	// sandbox (1) + 2 children + standalone (1) = 4
 	if len(rows) != 4 {
@@ -128,7 +128,7 @@ func TestContainerKindToRows_Unfolded(t *testing.T) {
 func TestContainerKindToRows_Folded(t *testing.T) {
 	data := testContainers()
 	folded := map[string]bool{"sandbox-abc": true}
-	rows := ContainerKind.ToRows(data, folded)
+	rows := ContainerKind.Rows(data, folded)
 
 	// sandbox folded (1) + standalone (1) = 2
 	if len(rows) != 2 {
@@ -144,51 +144,14 @@ func TestContainerKindRowID(t *testing.T) {
 	folded := map[string]bool{}
 
 	// Index 0 is sandbox with children
-	id := ContainerKind.RowID(data, folded, 0)
+	id := ContainerKind.FoldKey(data, folded, 0)
 	if id != "sandbox-abc" {
 		t.Errorf("RowID index 0 = %q, want %q", id, "sandbox-abc")
 	}
 
 	// Index 3 is standalone (no children)
-	id = ContainerKind.RowID(data, folded, 3)
+	id = ContainerKind.FoldKey(data, folded, 3)
 	if id != "" {
 		t.Errorf("RowID index 3 (standalone) = %q, want empty", id)
 	}
 }
-
-func TestContainerSnapshotRef(t *testing.T) {
-	data := testContainers()
-	folded := map[string]bool{}
-
-	// Index 0 = sandbox-abc
-	if got := ContainerSnapshotRef(data, folded, 0); got != "sha256:sandbox-snap" {
-		t.Errorf("ContainerSnapshotRef(0) = %q, want %q", got, "sha256:sandbox-snap")
-	}
-
-	// Index 1 = app-container-1 (child)
-	if got := ContainerSnapshotRef(data, folded, 1); got != "sha256:app1-snap" {
-		t.Errorf("ContainerSnapshotRef(1) = %q, want %q", got, "sha256:app1-snap")
-	}
-
-	// Index 3 = standalone-ctr (no snapshot key)
-	if got := ContainerSnapshotRef(data, folded, 3); got != "" {
-		t.Errorf("ContainerSnapshotRef(3) = %q, want empty", got)
-	}
-
-	// When sandbox is folded, index 1 = standalone-ctr
-	foldedMap := map[string]bool{"sandbox-abc": true}
-	if got := ContainerSnapshotRef(data, foldedMap, 1); got != "" {
-		t.Errorf("ContainerSnapshotRef(1, folded) = %q, want empty", got)
-	}
-
-	// Out of bounds
-	if got := ContainerSnapshotRef(data, folded, 99); got != "" {
-		t.Errorf("ContainerSnapshotRef(99) = %q, want empty", got)
-	}
-
-	// Nil data
-	if got := ContainerSnapshotRef(nil, folded, 0); got != "" {
-		t.Errorf("ContainerSnapshotRef(nil) = %q, want empty", got)
-	}
-}
-

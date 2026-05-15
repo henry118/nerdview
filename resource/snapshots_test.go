@@ -35,7 +35,7 @@ func testSnapshots() []snapshots.Info {
 
 func TestSnapshotKindToRows_Unfolded(t *testing.T) {
 	data := testSnapshots()
-	rows := SnapshotKind.ToRows(data, nil)
+	rows := SnapshotKind.Rows(data, nil)
 
 	// All 6 snapshots should be visible
 	if len(rows) != 6 {
@@ -59,7 +59,7 @@ func TestSnapshotKindToRows_Folded(t *testing.T) {
 	data := testSnapshots()
 	folded := map[string]bool{"layer1": true, "rootB": true}
 
-	rows := SnapshotKind.ToRows(data, folded)
+	rows := SnapshotKind.Rows(data, folded)
 
 	// Only root nodes visible: layer1 + rootB = 2
 	if len(rows) != 2 {
@@ -91,13 +91,13 @@ func TestSnapshotKindRowID(t *testing.T) {
 	folded := map[string]bool{}
 
 	// Index 0 is layer1 (root with children)
-	id := SnapshotKind.RowID(data, folded, 0)
+	id := SnapshotKind.FoldKey(data, folded, 0)
 	if id != "layer1" {
 		t.Errorf("RowID index 0 = %q, want %q", id, "layer1")
 	}
 
 	// Index 1 is layer2 (non-root, should not be foldable)
-	id = SnapshotKind.RowID(data, folded, 1)
+	id = SnapshotKind.FoldKey(data, folded, 1)
 	if id != "" {
 		t.Errorf("RowID index 1 (non-root) = %q, want empty", id)
 	}

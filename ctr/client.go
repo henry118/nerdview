@@ -19,10 +19,10 @@ package ctr
 import (
 	"context"
 
-	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	tasktypes "github.com/containerd/containerd/api/types/task"
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
+	tasktypes "github.com/containerd/containerd/api/types/task"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
@@ -186,18 +186,18 @@ func (c *Client) ImageTrees(ctx context.Context, ns, snapshotter string) ([]Imag
 }
 
 var knownMediaTypes = map[string]bool{
-	"application/vnd.oci.image.index.v1+json":                  true,
-	"application/vnd.oci.image.manifest.v1+json":               true,
-	"application/vnd.oci.image.config.v1+json":                 true,
-	"application/vnd.oci.image.layer.v1.tar":                   true,
-	"application/vnd.oci.image.layer.v1.tar+gzip":              true,
-	"application/vnd.oci.image.layer.v1.tar+zstd":              true,
-	"application/vnd.oci.image.layer.nondistributable.v1.tar":  true,
+	"application/vnd.oci.image.index.v1+json":                      true,
+	"application/vnd.oci.image.manifest.v1+json":                   true,
+	"application/vnd.oci.image.config.v1+json":                     true,
+	"application/vnd.oci.image.layer.v1.tar":                       true,
+	"application/vnd.oci.image.layer.v1.tar+gzip":                  true,
+	"application/vnd.oci.image.layer.v1.tar+zstd":                  true,
+	"application/vnd.oci.image.layer.nondistributable.v1.tar":      true,
 	"application/vnd.oci.image.layer.nondistributable.v1.tar+gzip": true,
-	"application/vnd.docker.distribution.manifest.v2+json":     true,
-	"application/vnd.docker.distribution.manifest.list.v2+json": true,
-	"application/vnd.docker.container.image.v1+json":           true,
-	"application/vnd.docker.image.rootfs.diff.tar.gzip":        true,
+	"application/vnd.docker.distribution.manifest.v2+json":         true,
+	"application/vnd.docker.distribution.manifest.list.v2+json":    true,
+	"application/vnd.docker.container.image.v1+json":               true,
+	"application/vnd.docker.image.rootfs.diff.tar.gzip":            true,
 }
 
 func isKnownDescriptor(desc ocispec.Descriptor) bool {
@@ -275,10 +275,10 @@ type TaskInfo struct {
 	Cmdline     string
 }
 
-// TasksWithSpec returns all tasks in the namespace, each enriched with the
+// Tasks returns all tasks in the namespace, each enriched with the
 // container's OCI runtime spec and computed bundle path. Exec processes are
 // included as separate entries with ExecID set.
-func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, error) {
+func (c *Client) Tasks(ctx context.Context, ns string) ([]TaskInfo, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	resp, err := c.inner.TaskService().List(ctx, &tasks.ListTasksRequest{})
 	if err != nil {
@@ -305,7 +305,7 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 		result = append(result, info)
 
 		// Fetch exec processes via ListPids
-		execIDs := c.listExecIDs(ctx, p.ID)
+		execIDs := c.execIDs(ctx, p.ID)
 		for _, execID := range execIDs {
 			execResp, err := c.inner.TaskService().Get(ctx, &tasks.GetRequest{
 				ContainerID: p.ID,
@@ -326,7 +326,7 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 	return result, nil
 }
 
-func (c *Client) listExecIDs(ctx context.Context, containerID string) []string {
+func (c *Client) execIDs(ctx context.Context, containerID string) []string {
 	resp, err := c.inner.TaskService().ListPids(ctx, &tasks.ListPidsRequest{
 		ContainerID: containerID,
 	})
@@ -348,8 +348,6 @@ func (c *Client) listExecIDs(ctx context.Context, containerID string) []string {
 	}
 	return execIDs
 }
-
-
 
 // Snapshotters returns the names of all available snapshotter plugins.
 func (c *Client) Snapshotters(ctx context.Context) ([]string, error) {

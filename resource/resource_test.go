@@ -98,13 +98,41 @@ func TestShortDigest(t *testing.T) {
 	}
 }
 
+type testKind struct {
+	toRows     func(data any, folded map[string]bool) []table.Row
+	foldKey    func(data any, folded map[string]bool, index int) string
+	initFolded func(data any) map[string]bool
+}
+
+func (k testKind) Name() string { return "Test" }
+func (k testKind) Columns() []Column {
+	return []Column{{Title: "Name", MinWidth: 10, Flex: true}}
+}
+func (k testKind) Rows(data any, folded map[string]bool) []table.Row {
+	return k.toRows(data, folded)
+}
+func (k testKind) FoldKey(data any, folded map[string]bool, index int) string {
+	if k.foldKey == nil {
+		return ""
+	}
+	return k.foldKey(data, folded, index)
+}
+func (k testKind) InitFolded(data any) map[string]bool {
+	if k.initFolded == nil {
+		return nil
+	}
+	return k.initFolded(data)
+}
+func (k testKind) Detail(_ any, _ map[string]bool, _ int) (string, string) {
+	return "", ""
+}
+func (k testKind) CrossRefs(_ any, _ map[string]bool) []string {
+	return nil
+}
+
 func TestTab_FoldUnfold(t *testing.T) {
-	kind := Kind{
-		Name: "Test",
-		Columns: []Column{
-			{Title: "Name", MinWidth: 10, Flex: true},
-		},
-		ToRows: func(data any, folded map[string]bool) []table.Row {
+	kind := testKind{
+		toRows: func(data any, folded map[string]bool) []table.Row {
 			items := data.([]string)
 			var rows []table.Row
 			for _, item := range items {
@@ -117,9 +145,8 @@ func TestTab_FoldUnfold(t *testing.T) {
 			}
 			return rows
 		},
-		RowID: func(data any, folded map[string]bool, index int) string {
+		foldKey: func(data any, folded map[string]bool, index int) string {
 			items := data.([]string)
-			// Rebuild visible rows to find which item is at index
 			rowIdx := 0
 			for _, item := range items {
 				if rowIdx == index {
@@ -137,18 +164,15 @@ func TestTab_FoldUnfold(t *testing.T) {
 	tab := NewTab(kind, 80, 10)
 	tab.UpdateData([]string{"parent1", "parent2"})
 
-	// Initially unfolded — should have 4 rows (2 parents + 2 children)
 	if len(tab.Table.Rows()) != 4 {
 		t.Fatalf("Expected 4 rows unfolded, got %d", len(tab.Table.Rows()))
 	}
 
-	// Fold first item
 	tab.Fold()
 	if len(tab.Table.Rows()) != 3 {
 		t.Fatalf("Expected 3 rows after folding first, got %d", len(tab.Table.Rows()))
 	}
 
-	// Unfold it
 	tab.Unfold()
 	if len(tab.Table.Rows()) != 4 {
 		t.Fatalf("Expected 4 rows after unfolding, got %d", len(tab.Table.Rows()))
@@ -156,12 +180,8 @@ func TestTab_FoldUnfold(t *testing.T) {
 }
 
 func TestTab_FoldPreservedOnRefresh(t *testing.T) {
-	kind := Kind{
-		Name: "Test",
-		Columns: []Column{
-			{Title: "Name", MinWidth: 10, Flex: true},
-		},
-		ToRows: func(data any, folded map[string]bool) []table.Row {
+	kind := testKind{
+		toRows: func(data any, folded map[string]bool) []table.Row {
 			items := data.([]string)
 			var rows []table.Row
 			for _, item := range items {
@@ -174,7 +194,7 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 			}
 			return rows
 		},
-		RowID: func(data any, folded map[string]bool, index int) string {
+		foldKey: func(data any, folded map[string]bool, index int) string {
 			items := data.([]string)
 			rowIdx := 0
 			for _, item := range items {
@@ -188,7 +208,7 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 			}
 			return ""
 		},
-		InitFolded: func(data any) map[string]bool {
+		initFolded: func(data any) map[string]bool {
 			items := data.([]string)
 			folded := make(map[string]bool)
 			for _, item := range items {
@@ -201,26 +221,21 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 	tab := NewTab(kind, 80, 10)
 	tab.UpdateData([]string{"parent1", "parent2"})
 
-	// InitFolded folds everything — should have 2 rows
 	if len(tab.Table.Rows()) != 2 {
 		t.Fatalf("Expected 2 rows (all folded), got %d", len(tab.Table.Rows()))
 	}
 
-	// User unfolds parent1
 	tab.Unfold()
 	if len(tab.Table.Rows()) != 3 {
 		t.Fatalf("Expected 3 rows after unfolding parent1, got %d", len(tab.Table.Rows()))
 	}
 
-	// Simulate data refresh with same data — parent1 should stay unfolded
 	tab.UpdateData([]string{"parent1", "parent2"})
 	if len(tab.Table.Rows()) != 3 {
 		t.Fatalf("Expected 3 rows after refresh (parent1 still unfolded), got %d", len(tab.Table.Rows()))
 	}
 
-	// Simulate refresh with new item added — new item should be folded, parent1 still unfolded
 	tab.UpdateData([]string{"parent1", "parent2", "parent3"})
-	// parent1 unfolded (2 rows) + parent2 folded (1 row) + parent3 folded (1 row) = 4
 	if len(tab.Table.Rows()) != 4 {
 		t.Fatalf("Expected 4 rows after adding parent3 (folded by default), got %d", len(tab.Table.Rows()))
 	}

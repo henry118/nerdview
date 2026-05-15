@@ -79,7 +79,7 @@ func testImageTrees() []ctr.ImageTree {
 
 func TestImageKindToRows_Unfolded(t *testing.T) {
 	data := testImageTrees()
-	rows := ImageKind.ToRows(data, nil)
+	rows := ImageKind.Rows(data, nil)
 
 	// nginx (1) + linux/amd64 (1) + config (1) + layer (1) + linux/arm64 (1) + alpine (1) = 6
 	if len(rows) != 6 {
@@ -107,7 +107,7 @@ func TestImageKindToRows_Folded(t *testing.T) {
 	nginxDigest := data[0].Desc.Digest.String()
 	folded := map[string]bool{nginxDigest: true}
 
-	rows := ImageKind.ToRows(data, folded)
+	rows := ImageKind.Rows(data, folded)
 
 	// nginx folded (1) + alpine (1) = 2
 	if len(rows) != 2 {
@@ -139,13 +139,13 @@ func TestImageKindRowID(t *testing.T) {
 	folded := map[string]bool{}
 
 	// Index 0 is nginx (has children) — should return its digest
-	id := ImageKind.RowID(data, folded, 0)
+	id := ImageKind.FoldKey(data, folded, 0)
 	if id == "" {
 		t.Error("RowID for nginx (index 0) should be non-empty")
 	}
 
 	// Find alpine's index (last row = 5 when unfolded)
-	id = ImageKind.RowID(data, folded, 5)
+	id = ImageKind.FoldKey(data, folded, 5)
 	if id != "" {
 		t.Errorf("RowID for alpine (no children) should be empty, got %q", id)
 	}
@@ -283,7 +283,7 @@ func TestImageKindToRows_SizeShowsTotal(t *testing.T) {
 		},
 	}
 
-	rows := ImageKind.ToRows(data, nil)
+	rows := ImageKind.Rows(data, nil)
 
 	// Root row should show total size (500 + 1000 + 10M)
 	rootSize := rows[0][4]
@@ -328,7 +328,7 @@ func TestImagesSortedByDigest(t *testing.T) {
 		},
 	}
 
-	rows := ImageKind.ToRows(data, nil)
+	rows := ImageKind.Rows(data, nil)
 	if len(rows) != 2 {
 		t.Fatalf("Expected 2 rows, got %d", len(rows))
 	}
@@ -370,7 +370,7 @@ func TestImagesDuplicateDigestAdjacent(t *testing.T) {
 		},
 	}
 
-	rows := ImageKind.ToRows(data, nil)
+	rows := ImageKind.Rows(data, nil)
 
 	// Find positions of the two shared-digest rows
 	var sharedPositions []int
