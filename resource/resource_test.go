@@ -98,7 +98,7 @@ func TestShortDigest(t *testing.T) {
 	}
 }
 
-func TestTab_ToggleFold(t *testing.T) {
+func TestTab_FoldUnfold(t *testing.T) {
 	kind := Kind{
 		Name: "Test",
 		Columns: []Column{
@@ -143,13 +143,13 @@ func TestTab_ToggleFold(t *testing.T) {
 	}
 
 	// Fold first item
-	tab.ToggleFold()
+	tab.Fold()
 	if len(tab.Table.Rows()) != 3 {
 		t.Fatalf("Expected 3 rows after folding first, got %d", len(tab.Table.Rows()))
 	}
 
 	// Unfold it
-	tab.ToggleFold()
+	tab.Unfold()
 	if len(tab.Table.Rows()) != 4 {
 		t.Fatalf("Expected 4 rows after unfolding, got %d", len(tab.Table.Rows()))
 	}
@@ -207,7 +207,7 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 	}
 
 	// User unfolds parent1
-	tab.ToggleFold()
+	tab.Unfold()
 	if len(tab.Table.Rows()) != 3 {
 		t.Fatalf("Expected 3 rows after unfolding parent1, got %d", len(tab.Table.Rows()))
 	}

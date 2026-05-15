@@ -228,6 +228,213 @@ func TestGoToImageToSnapshot(t *testing.T) {
 	}
 }
 
+func TestGoToUnfoldsHiddenSnapshot(t *testing.T) {
+	m := testModel()
+	m.width = 200
+	m.height = 24
+	for _, tab := range m.resources {
+		tab.SetWidth(m.width)
+		tab.Table.SetHeight(20)
+	}
+
+	rootSnap := "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000"
+	childSnap := "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1111"
+
+	// Container references the child snapshot
+	ctrs := []ctr.ContainerInfo{
+		{
+			Container: containers.Container{
+				ID:          "my-container",
+				Image:       "nginx:latest",
+				Runtime:     containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
+				CreatedAt:   time.Now(),
+				SnapshotKey: childSnap,
+			},
+		},
+	}
+	m.resources[tabContainers].UpdateData(ctrs)
+
+	// Snapshots: root with child underneath (child is hidden when root is folded)
+	snaps := []snapshots.Info{
+		{Name: rootSnap, Parent: "", Kind: snapshots.KindCommitted, Created: time.Now()},
+		{Name: childSnap, Parent: rootSnap, Kind: snapshots.KindActive, Created: time.Now()},
+	}
+	m.resources[tabSnapshots].UpdateData(snaps)
+
+	// Verify the child is hidden (root is folded by default via InitFolded)
+	rows := m.resources[tabSnapshots].Table.Rows()
+	shortChild := resource.ShortDigest(childSnap)
+	found := false
+	for _, row := range rows {
+		if len(row) > 0 && strings.Contains(row[0], shortChild) {
+			found = true
+		}
+	}
+	if found {
+		t.Fatal("Child snapshot should be hidden (folded) before navigation")
+	}
+
+	// Navigate from container to snapshot
+	m.activeRes = tabContainers
+	m.resources[tabContainers].Table.Focus()
+
+	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	newModel, _ := m.Update(goToKey)
+	m = newModel.(model)
+
+	if m.activeRes != tabSnapshots {
+		t.Fatalf("Expected to jump to snapshots tab (%d), got %d", tabSnapshots, m.activeRes)
+	}
+
+	// Verify the child is now visible and cursor is on it
+	rows = m.resources[tabSnapshots].Table.Rows()
+	cursor := m.resources[tabSnapshots].Table.Cursor()
+	if cursor >= len(rows) {
+		t.Fatalf("Cursor %d out of range (rows=%d)", cursor, len(rows))
+	}
+	if !strings.Contains(rows[cursor][0], shortChild) {
+		t.Errorf("Cursor row = %q, does not contain child snapshot %q", rows[cursor][0], shortChild)
+	}
+}
+
+func TestGoToUnfoldsOnlyTargetAncestor(t *testing.T) {
+	m := testModel()
+	m.width = 200
+	m.height = 24
+	for _, tab := range m.resources {
+		tab.SetWidth(m.width)
+		tab.Table.SetHeight(20)
+	}
+
+	rootA := "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	childA := "sha256:aaaa111111111111111111111111111111111111111111111111111111111111"
+	rootB := "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	childB := "sha256:bbbb111111111111111111111111111111111111111111111111111111111111"
+
+	// Container references childA
+	ctrs := []ctr.ContainerInfo{
+		{
+			Container: containers.Container{
+				ID:          "my-container",
+				Image:       "nginx:latest",
+				Runtime:     containers.RuntimeInfo{Name: "io.containerd.runc.v2"},
+				CreatedAt:   time.Now(),
+				SnapshotKey: childA,
+			},
+		},
+	}
+	m.resources[tabContainers].UpdateData(ctrs)
+
+	// Two snapshot trees, both folded by default
+	snaps := []snapshots.Info{
+		{Name: rootA, Parent: "", Kind: snapshots.KindCommitted, Created: time.Now()},
+		{Name: childA, Parent: rootA, Kind: snapshots.KindActive, Created: time.Now()},
+		{Name: rootB, Parent: "", Kind: snapshots.KindCommitted, Created: time.Now()},
+		{Name: childB, Parent: rootB, Kind: snapshots.KindActive, Created: time.Now()},
+	}
+	m.resources[tabSnapshots].UpdateData(snaps)
+
+	// Verify both roots are folded (only 2 visible rows)
+	rows := m.resources[tabSnapshots].Table.Rows()
+	if len(rows) != 2 {
+		t.Fatalf("Expected 2 rows (both folded), got %d", len(rows))
+	}
+
+	// Navigate to snapshot from container
+	m.activeRes = tabContainers
+	m.resources[tabContainers].Table.Focus()
+	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	newModel, _ := m.Update(goToKey)
+	m = newModel.(model)
+
+	// rootA should be unfolded (childA visible), rootB should stay folded
+	rows = m.resources[tabSnapshots].Table.Rows()
+	shortChildA := resource.ShortDigest(childA)
+	shortChildB := resource.ShortDigest(childB)
+
+	foundChildA := false
+	foundChildB := false
+	for _, row := range rows {
+		if len(row) > 0 {
+			if strings.Contains(row[0], shortChildA) {
+				foundChildA = true
+			}
+			if strings.Contains(row[0], shortChildB) {
+				foundChildB = true
+			}
+		}
+	}
+	if !foundChildA {
+		t.Error("childA should be visible (its ancestor was unfolded)")
+	}
+	if foundChildB {
+		t.Error("childB should still be hidden (unrelated tree should stay folded)")
+	}
+}
+
+func TestTabSwitchForward(t *testing.T) {
+	m := testModel()
+	m.width = 80
+	m.height = 24
+
+	if m.activeRes != tabImages {
+		t.Fatalf("Expected initial tab to be images (%d), got %d", tabImages, m.activeRes)
+	}
+
+	tabKey := tea.KeyMsg{Type: tea.KeyTab}
+
+	newModel, _ := m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabSnapshots {
+		t.Errorf("After 1st Tab: expected %d, got %d", tabSnapshots, m.activeRes)
+	}
+
+	newModel, _ = m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabContainers {
+		t.Errorf("After 2nd Tab: expected %d, got %d", tabContainers, m.activeRes)
+	}
+
+	newModel, _ = m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabTasks {
+		t.Errorf("After 3rd Tab: expected %d, got %d", tabTasks, m.activeRes)
+	}
+
+	newModel, _ = m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabEvents {
+		t.Errorf("After 4th Tab: expected %d, got %d", tabEvents, m.activeRes)
+	}
+
+	// Wraps around
+	newModel, _ = m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabImages {
+		t.Errorf("After 5th Tab (wrap): expected %d, got %d", tabImages, m.activeRes)
+	}
+}
+
+func TestTabSwitchBackward(t *testing.T) {
+	m := testModel()
+	m.width = 80
+	m.height = 24
+
+	shiftTabKey := tea.KeyMsg{Type: tea.KeyShiftTab}
+
+	newModel, _ := m.Update(shiftTabKey)
+	m = newModel.(model)
+	if m.activeRes != tabEvents {
+		t.Errorf("After 1st Shift+Tab: expected %d, got %d", tabEvents, m.activeRes)
+	}
+
+	newModel, _ = m.Update(shiftTabKey)
+	m = newModel.(model)
+	if m.activeRes != tabTasks {
+		t.Errorf("After 2nd Shift+Tab: expected %d, got %d", tabTasks, m.activeRes)
+	}
+}
+
 func TestEventsFilteredByNamespace(t *testing.T) {
 	m := testModel()
 

@@ -19,11 +19,12 @@ import "github.com/charmbracelet/bubbles/key"
 type keyMap struct {
 	Up                key.Binding
 	Down              key.Binding
+	Right             key.Binding
+	Left              key.Binding
 	NextResource      key.Binding
 	PrevResource      key.Binding
 	SelectNS          key.Binding
 	SelectSnapshotter key.Binding
-	ToggleFold        key.Binding
 	GoTo              key.Binding
 	GoBack            key.Binding
 	Spec              key.Binding
@@ -41,13 +42,21 @@ var keys = keyMap{
 		key.WithKeys("down", "j"),
 		key.WithHelp("↓/j", "down"),
 	),
+	Right: key.NewBinding(
+		key.WithKeys("right", "l"),
+		key.WithHelp("→/l", "unfold"),
+	),
+	Left: key.NewBinding(
+		key.WithKeys("left", "h"),
+		key.WithHelp("←/h", "fold"),
+	),
 	NextResource: key.NewBinding(
-		key.WithKeys("right"),
-		key.WithHelp("→", "next resource"),
+		key.WithKeys("tab"),
+		key.WithHelp("Tab", "next tab"),
 	),
 	PrevResource: key.NewBinding(
-		key.WithKeys("left"),
-		key.WithHelp("←", "prev resource"),
+		key.WithKeys("shift+tab"),
+		key.WithHelp("S-Tab", "prev tab"),
 	),
 	SelectNS: key.NewBinding(
 		key.WithKeys("n"),
@@ -56,10 +65,6 @@ var keys = keyMap{
 	SelectSnapshotter: key.NewBinding(
 		key.WithKeys("s"),
 		key.WithHelp("s", "snapshotter"),
-	),
-	ToggleFold: key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("Tab", "fold/unfold"),
 	),
 	GoTo: key.NewBinding(
 		key.WithKeys("g"),

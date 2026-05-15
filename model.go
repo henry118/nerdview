@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -327,10 +328,17 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.resources[m.activeRes].Table.Focus()
 		return m, nil
 
-	case key.Matches(msg, keys.ToggleFold):
+	case key.Matches(msg, keys.Right):
 		tab := m.resources[m.activeRes]
 		if tab.CanFold() {
-			tab.ToggleFold()
+			tab.Unfold()
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.Left):
+		tab := m.resources[m.activeRes]
+		if tab.CanFold() {
+			tab.Fold()
 		}
 		return m, nil
 
@@ -354,12 +362,11 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.activeRes = targetTab
 			m.resources[m.activeRes].Table.Focus()
 			shortKey := resource.ShortDigest(targetKey)
-			rows := m.resources[m.activeRes].Table.Rows()
-			for i, row := range rows {
-				if len(row) > 0 && strings.Contains(row[0], shortKey) {
-					m.resources[m.activeRes].Table.SetCursor(i)
-					break
-				}
+			targetIdx := m.resources[m.activeRes].RevealRow(func(row table.Row) bool {
+				return len(row) > 0 && strings.Contains(row[0], shortKey)
+			})
+			if targetIdx >= 0 {
+				m.resources[m.activeRes].Table.SetCursor(targetIdx)
 			}
 		}
 		return m, nil
