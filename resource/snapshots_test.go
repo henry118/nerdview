@@ -15,6 +15,7 @@
 package resource
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -131,5 +132,71 @@ func TestSnapshotNodeAtIndex(t *testing.T) {
 	}
 	if foldedResult.Nodes[1].ID != "rootB" {
 		t.Errorf("folded index 1 = %q, want %q", foldedResult.Nodes[1].ID, "rootB")
+	}
+}
+
+func TestSnapshotKindDetail(t *testing.T) {
+	data := testSnapshots()
+
+	title, body := SnapshotKind.Detail(data, nil, 0)
+	if title != "layer1" {
+		t.Errorf("Title = %q, want %q", title, "layer1")
+	}
+	if !strings.Contains(body, "Name:    layer1") {
+		t.Error("Should contain name")
+	}
+	if !strings.Contains(body, "Kind:    Committed") {
+		t.Error("Should contain kind")
+	}
+}
+
+func TestSnapshotKindNameAndColumns(t *testing.T) {
+	if SnapshotKind.Name() != "Snapshots" {
+		t.Errorf("Name = %q, want %q", SnapshotKind.Name(), "Snapshots")
+	}
+	cols := SnapshotKind.Columns()
+	if len(cols) != 3 {
+		t.Errorf("Expected 3 columns, got %d", len(cols))
+	}
+}
+
+func TestSnapshotKindDetail_WithLabels(t *testing.T) {
+	data := []snapshots.Info{
+		{
+			Name:   "labeled-snap",
+			Kind:   snapshots.KindActive,
+			Labels: map[string]string{"containerd.io/gc.root": "true"},
+		},
+	}
+
+	_, body := SnapshotKind.Detail(data, nil, 0)
+	if !strings.Contains(body, "Labels:") {
+		t.Error("Should show labels section")
+	}
+	if !strings.Contains(body, "containerd.io/gc.root: true") {
+		t.Error("Should show label content")
+	}
+}
+
+func TestSnapshotKind_NilData(t *testing.T) {
+	if rows := SnapshotKind.Rows(nil, nil); rows != nil {
+		t.Error("Rows(nil) should be nil")
+	}
+	if id := SnapshotKind.FoldKey(nil, nil, 0); id != "" {
+		t.Error("FoldKey(nil) should be empty")
+	}
+	if folded := SnapshotKind.InitFolded(nil); folded != nil {
+		t.Error("InitFolded(nil) should be nil")
+	}
+	if _, body := SnapshotKind.Detail(nil, nil, 0); body != "" {
+		t.Error("Detail(nil) should be empty")
+	}
+}
+
+func TestSnapshotKindCrossRefs(t *testing.T) {
+	data := testSnapshots()
+	refs := SnapshotKind.CrossRefs(data, nil)
+	if refs != nil {
+		t.Errorf("Snapshots should have no cross refs, got %v", refs)
 	}
 }

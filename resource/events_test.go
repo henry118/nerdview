@@ -104,3 +104,31 @@ func TestEventKindToDetail_NilPayload(t *testing.T) {
 		t.Error("Body should NOT contain payload section when payload is nil")
 	}
 }
+
+func TestEventKindNameAndColumns(t *testing.T) {
+	if EventKind.Name() != "Events" {
+		t.Errorf("Name = %q, want %q", EventKind.Name(), "Events")
+	}
+	cols := EventKind.Columns()
+	if len(cols) != 3 {
+		t.Errorf("Expected 3 columns, got %d", len(cols))
+	}
+}
+
+func TestEventKind_NilAndEdgeCases(t *testing.T) {
+	if rows := EventKind.Rows(nil, nil); rows != nil {
+		t.Error("Rows(nil) should be nil")
+	}
+	if id := EventKind.FoldKey(nil, nil, 0); id != "" {
+		t.Error("FoldKey should always be empty")
+	}
+	if folded := EventKind.InitFolded(nil); folded != nil {
+		t.Error("InitFolded should always be nil")
+	}
+	if refs := EventKind.CrossRefs(nil, nil); refs != nil {
+		t.Error("CrossRefs should always be nil")
+	}
+	if _, body := EventKind.Detail(nil, nil, 0); body != "" {
+		t.Error("Detail(nil) should be empty")
+	}
+}

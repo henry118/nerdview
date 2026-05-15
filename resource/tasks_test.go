@@ -164,3 +164,54 @@ func TestTaskKindToDetail_Stopped(t *testing.T) {
 		t.Error("Stopped task should show exited_at time")
 	}
 }
+
+func TestTaskKindNameAndColumns(t *testing.T) {
+	if TaskKind.Name() != "Tasks" {
+		t.Errorf("Name = %q, want %q", TaskKind.Name(), "Tasks")
+	}
+	cols := TaskKind.Columns()
+	if len(cols) != 7 {
+		t.Errorf("Expected 7 columns, got %d", len(cols))
+	}
+}
+
+func TestTaskKindCrossRefs(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
+		{ContainerID: "ctr-2", Process: &tasktypes.Process{ID: "exec-1", Pid: 2}, ExecID: "exec-1"},
+	}
+	refs := TaskKind.CrossRefs(data, nil)
+	if len(refs) != 2 {
+		t.Fatalf("Expected 2 refs, got %d", len(refs))
+	}
+	if refs[0] != "ctr-1" {
+		t.Errorf("CrossRef[0] = %q, want %q", refs[0], "ctr-1")
+	}
+	if refs[1] != "ctr-2" {
+		t.Errorf("CrossRef[1] = %q, want %q", refs[1], "ctr-2")
+	}
+}
+
+func TestTaskKind_NilData(t *testing.T) {
+	if rows := TaskKind.Rows(nil, nil); rows != nil {
+		t.Error("Rows(nil) should be nil")
+	}
+	if _, body := TaskKind.Detail(nil, nil, 0); body != "" {
+		t.Error("Detail(nil) should be empty")
+	}
+	if refs := TaskKind.CrossRefs(nil, nil); refs != nil {
+		t.Error("CrossRefs(nil) should be nil")
+	}
+}
+
+func TestTaskKindFoldKeyAndInitFolded(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
+	}
+	if got := TaskKind.FoldKey(data, nil, 0); got != "" {
+		t.Errorf("Tasks should not be foldable, got %q", got)
+	}
+	if got := TaskKind.InitFolded(data); got != nil {
+		t.Errorf("Tasks InitFolded should be nil, got %v", got)
+	}
+}
