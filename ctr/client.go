@@ -185,41 +185,16 @@ func (c *Client) ImageTrees(ctx context.Context, ns, snapshotter string) ([]Imag
 	return trees, nil
 }
 
-var knownMediaTypes = map[string]bool{
-	"application/vnd.oci.image.index.v1+json":                      true,
-	"application/vnd.oci.image.manifest.v1+json":                   true,
-	"application/vnd.oci.image.config.v1+json":                     true,
-	"application/vnd.oci.image.layer.v1.tar":                       true,
-	"application/vnd.oci.image.layer.v1.tar+gzip":                  true,
-	"application/vnd.oci.image.layer.v1.tar+zstd":                  true,
-	"application/vnd.oci.image.layer.nondistributable.v1.tar":      true,
-	"application/vnd.oci.image.layer.nondistributable.v1.tar+gzip": true,
-	"application/vnd.docker.distribution.manifest.v2+json":         true,
-	"application/vnd.docker.distribution.manifest.list.v2+json":    true,
-	"application/vnd.docker.container.image.v1+json":               true,
-	"application/vnd.docker.image.rootfs.diff.tar.gzip":            true,
-}
-
 func isKnownDescriptor(desc ocispec.Descriptor) bool {
 	if desc.Platform != nil && desc.Platform.OS == "unknown" {
 		return false
 	}
-	if knownMediaTypes[desc.MediaType] {
+	mt := desc.MediaType
+	if images.IsManifestType(mt) || images.IsIndexType(mt) || images.IsLayerType(mt) || images.IsConfigType(mt) {
 		return true
 	}
 	// OCI index entries may omit MediaType; accept if they have a valid platform
-	if desc.MediaType == "" && desc.Platform != nil {
-		return true
-	}
-	return false
-}
-
-func isManifestType(mediaType string) bool {
-	switch mediaType {
-	case "application/vnd.oci.image.index.v1+json",
-		"application/vnd.oci.image.manifest.v1+json",
-		"application/vnd.docker.distribution.manifest.v2+json",
-		"application/vnd.docker.distribution.manifest.list.v2+json":
+	if mt == "" && desc.Platform != nil {
 		return true
 	}
 	return false
@@ -240,7 +215,7 @@ func walkContent(ctx context.Context, store content.Store, snLabel string, desc 
 			Children: walkContent(ctx, store, snLabel, child),
 		}
 		// Skip manifests that have no children (content not downloaded)
-		if isManifestType(child.MediaType) && len(node.Children) == 0 {
+		if (images.IsManifestType(child.MediaType) || images.IsIndexType(child.MediaType)) && len(node.Children) == 0 {
 			continue
 		}
 		// Read content info labels for snapshot cross-reference.

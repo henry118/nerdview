@@ -156,14 +156,30 @@ func TestShortMediaType(t *testing.T) {
 		input string
 		want  string
 	}{
+		// Index types
 		{"application/vnd.oci.image.index.v1+json", "index"},
+		{"application/vnd.docker.distribution.manifest.list.v2+json", "index"},
+		// Manifest types
 		{"application/vnd.oci.image.manifest.v1+json", "manifest"},
+		{"application/vnd.docker.distribution.manifest.v2+json", "manifest"},
+		// Config types
 		{"application/vnd.oci.image.config.v1+json", "config"},
+		{"application/vnd.docker.container.image.v1+json", "config"},
+		// OCI layer types (suffix after +)
 		{"application/vnd.oci.image.layer.v1.tar+gzip", "layer/gzip"},
 		{"application/vnd.oci.image.layer.v1.tar+zstd", "layer/zstd"},
-		{"application/vnd.docker.distribution.manifest.v2+json", "manifest"},
+		{"application/vnd.oci.image.layer.v1.tar+erofs", "layer/erofs"},
+		{"application/vnd.oci.image.layer.v1.tar", "layer"},
+		// Nondistributable OCI layers
+		{"application/vnd.oci.image.layer.nondistributable.v1.tar+gzip", "layer/gzip"},
+		{"application/vnd.oci.image.layer.nondistributable.v1.tar", "layer"},
+		// Docker layer types (compression after .tar.)
 		{"application/vnd.docker.image.rootfs.diff.tar.gzip", "layer/gzip"},
+		{"application/vnd.docker.image.rootfs.diff.tar.zstd", "layer/zstd"},
+		{"application/vnd.docker.image.rootfs.foreign.diff.tar.gzip", "layer/gzip"},
+		// Unknown fallback
 		{"something.unknown", "unknown"},
+		{"no-dot", "no-dot"},
 	}
 	for _, tt := range tests {
 		got := shortMediaType(tt.input)
