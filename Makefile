@@ -5,7 +5,7 @@ GOFLAGS ?=
 .PHONY: build clean vet test test-cover
 
 build:
-	$(GO) build $(GOFLAGS) -ldflags="-s -w" -o $(BINARY) .
+	CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags="-s -w" -o $(BINARY) .
 
 vet:
 	$(GO) vet ./...
