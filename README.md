@@ -25,8 +25,6 @@ A read-only terminal UI for inspecting [containerd](https://containerd.io/) reso
 - **Read-only** — nerdview only reads from containerd. It will never create, delete, or modify any resources.
 - **Linux only** — currently only implemented and tested on Linux.
 
-Navigate between related resources (e.g., jump from a container to its snapshot chain) and switch namespaces at runtime.
-
 ## Install
 
 ```bash
