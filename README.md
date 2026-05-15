@@ -10,19 +10,20 @@ A read-only terminal UI for inspecting [containerd](https://containerd.io/) reso
 
 ![screenshot](doc/images/screenshot.png)
 
-## Highlights
-
-- **Read-only** — nerdview only reads from containerd. It will never create, delete, or modify any resources.
-- **Linux only** — currently only implemented and tested on Linux.
-- **Live** — subscribes to containerd events and updates the display automatically.
-
-## What you can see
+## Features
 
 - **Images** — multi-platform index/manifest tree with layer counts and sizes
 - **Snapshots** — parent-child chain with snapshotter selection
 - **Containers** — sandbox/container grouping with runtime spec inspection
 - **Tasks** — running processes including exec sessions, with PID, cmdline, cgroups, and namespaces
 - **Events** — live stream of containerd lifecycle events
+- **Live updates** — subscribes to containerd events and refreshes automatically
+- **Cross-tab navigation** — jump between related resources (container → snapshot, task → container)
+
+## Important notes
+
+- **Read-only** — nerdview only reads from containerd. It will never create, delete, or modify any resources.
+- **Linux only** — currently only implemented and tested on Linux.
 
 Navigate between related resources (e.g., jump from a container to its snapshot chain) and switch namespaces at runtime.
 
