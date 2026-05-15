@@ -54,6 +54,11 @@ type tickMsg struct{}
 // statsTickMsg triggers a periodic daemon stats refresh.
 type statsTickMsg struct{}
 
+// debounceMsg fires after the debounce interval to trigger pending refreshes.
+type debounceMsg struct {
+	gen int // Generation counter to ignore stale timers.
+}
+
 // imagesRefreshedMsg is sent when images are reloaded due to a containerd event.
 type imagesRefreshedMsg []ctr.ImageTree
 
