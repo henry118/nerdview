@@ -29,11 +29,17 @@ import (
 // DaemonStats holds resource usage metrics for the containerd daemon process.
 type DaemonStats struct {
 	PID     int
-	CPUPct  float64       // Average CPU usage over process lifetime (like ps).
+	CPUPct  float64       // Current CPU usage percentage (like htop, per-core).
 	VMS     uint64        // Virtual memory size in bytes.
 	RSS     uint64        // Resident set size in bytes.
 	Threads int           // Number of threads.
 	Uptime  time.Duration // Time since process start.
+}
+
+// cpuSample stores the previous reading for delta-based CPU calculation.
+var prevCPUSample struct {
+	ticks uint64
+	time  time.Time
 }
 
 // DaemonPID returns the containerd daemon's PID via the introspection API.
@@ -80,6 +86,18 @@ func ReadDaemonStats(pid int) (DaemonStats, error) {
 
 		clkTck := uint64(100)
 		totalTicks := utime + stime
+		now := time.Now()
+
+		// Delta-based CPU percentage (like htop)
+		if !prevCPUSample.time.IsZero() {
+			elapsed := now.Sub(prevCPUSample.time).Seconds()
+			if elapsed > 0 {
+				deltaTicks := totalTicks - prevCPUSample.ticks
+				stats.CPUPct = (float64(deltaTicks) / float64(clkTck)) / elapsed * 100.0
+			}
+		}
+		prevCPUSample.ticks = totalTicks
+		prevCPUSample.time = now
 
 		uptimeData, err := os.ReadFile("/proc/uptime")
 		if err == nil {
@@ -90,7 +108,6 @@ func ReadDaemonStats(pid int) (DaemonStats, error) {
 				procUptime := systemUptime - procStartSec
 				if procUptime > 0 {
 					stats.Uptime = time.Duration(procUptime * float64(time.Second))
-					stats.CPUPct = (float64(totalTicks) / float64(clkTck)) / procUptime * 100.0
 				}
 			}
 		}
