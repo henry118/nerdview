@@ -75,6 +75,8 @@ type model struct {
 	daemonPID    int              // Containerd daemon PID.
 	daemonStats  ctr.DaemonStats  // Latest daemon resource stats.
 	navHistory   []navState       // Stack for cross-tab back navigation.
+	dirtyTabs    map[int]bool     // Tabs needing refresh due to pending events.
+	debounceGen  int              // Generation counter to discard stale debounce timers.
 	width        int              // Terminal width.
 	height       int              // Terminal height.
 	err          error            // Last error to display in status bar.
@@ -93,7 +95,8 @@ func newModel(client *ctr.Client, namespace string) model {
 			new(resource.NewTab(resource.TaskKind, 80, 10)),
 			new(resource.NewTab(resource.EventKind, 80, 10)),
 		},
-		dialog: ui.NewDialog(80, 24),
+		dialog:    ui.NewDialog(80, 24),
+		dirtyTabs: make(map[int]bool),
 	}
 }
 
@@ -157,7 +160,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmds []tea.Cmd
 		cmds = append(cmds, ctr.WaitForEvent(m.client))
 		if msg.Namespace == m.namespaces[m.activeNS] {
-			cmds = append(cmds, refreshResource(m.client, m.namespaces[m.activeNS], m.snapshotter, msg.Topic))
+			switch {
+			case strings.HasPrefix(msg.Topic, "/images/"):
+				m.dirtyTabs[tabImages] = true
+			case strings.HasPrefix(msg.Topic, "/containers/"):
+				m.dirtyTabs[tabContainers] = true
+			case strings.HasPrefix(msg.Topic, "/tasks/"):
+				m.dirtyTabs[tabTasks] = true
+			case strings.HasPrefix(msg.Topic, "/snapshot/"):
+				m.dirtyTabs[tabSnapshots] = true
+			}
+			m.debounceGen++
+			cmds = append(cmds, debounceCmd(m.debounceGen))
 			m.events = append([]resource.Event{{
 				Timestamp: msg.Timestamp,
 				Namespace: msg.Namespace,
@@ -185,6 +199,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			refreshDaemonStats(m.client, m.daemonPID),
 			statsTickCmd(),
 		)
+
+	case debounceMsg:
+		if msg.gen != m.debounceGen || len(m.dirtyTabs) == 0 {
+			return m, nil
+		}
+		var cmds []tea.Cmd
+		for tab := range m.dirtyTabs {
+			cmds = append(cmds, refreshSingleTab(m.client, tab, m.namespaces[m.activeNS], m.snapshotter))
+		}
+		m.dirtyTabs = make(map[int]bool)
+		return m, tea.Batch(cmds...)
 
 	case imagesRefreshedMsg:
 		m.resources[tabImages].UpdateData([]ctr.ImageTree(msg))
@@ -462,38 +487,44 @@ func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
 	}
 }
 
-// refreshResource reloads a single resource type based on an event topic.
-func refreshResource(client *ctr.Client, ns, snapshotter, topic string) tea.Cmd {
+// debounceCmd starts a debounce timer. Only the latest generation fires a refresh.
+func debounceCmd(gen int) tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(time.Time) tea.Msg {
+		return debounceMsg{gen: gen}
+	})
+}
+
+// refreshSingleTab reloads one resource type by tab index.
+func refreshSingleTab(client *ctr.Client, tab int, ns, snapshotter string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		switch {
-		case strings.HasPrefix(topic, "/images/"):
+		switch tab {
+		case tabImages:
 			imgs, err := client.ImageTrees(ctx, ns, snapshotter)
 			if err != nil {
 				return errorMsg{err: err}
 			}
 			return imagesRefreshedMsg(imgs)
-		case strings.HasPrefix(topic, "/containers/"):
+		case tabContainers:
 			ctrs, err := client.Containers(ctx, ns)
 			if err != nil {
 				return errorMsg{err: err}
 			}
 			return containersRefreshedMsg(ctrs)
-		case strings.HasPrefix(topic, "/tasks/"):
+		case tabTasks:
 			tasks, err := client.Tasks(ctx, ns)
 			if err != nil {
 				return errorMsg{err: err}
 			}
 			return tasksRefreshedMsg(tasks)
-		case strings.HasPrefix(topic, "/snapshot/"):
+		case tabSnapshots:
 			snaps, err := client.Snapshots(ctx, ns, snapshotter)
 			if err != nil {
 				return errorMsg{err: err}
 			}
 			return snapshotsRefreshedMsg(snaps)
-		default:
-			return nil
 		}
+		return nil
 	}
 }
 

@@ -40,6 +40,7 @@ func testModel() model {
 			new(resource.NewTab(resource.TaskKind, 80, 10)),
 			new(resource.NewTab(resource.EventKind, 80, 10)),
 		},
+		dirtyTabs: make(map[int]bool),
 	}
 	return m
 }
@@ -432,6 +433,76 @@ func TestTabSwitchBackward(t *testing.T) {
 	m = newModel.(model)
 	if m.activeRes != tabTasks {
 		t.Errorf("After 2nd Shift+Tab: expected %d, got %d", tabTasks, m.activeRes)
+	}
+}
+
+func TestDebounceCoalescesMultipleEvents(t *testing.T) {
+	m := testModel()
+
+	// Send 5 container events rapidly
+	for i := 0; i < 5; i++ {
+		msg := ctr.EventMsg{
+			Namespace: "default",
+			Topic:     "/containers/create",
+			Timestamp: time.Now(),
+		}
+		newModel, _ := m.Update(msg)
+		m = newModel.(model)
+	}
+
+	// Only container tab should be dirty
+	if !m.dirtyTabs[tabContainers] {
+		t.Error("tabContainers should be dirty after container events")
+	}
+	if m.dirtyTabs[tabImages] {
+		t.Error("tabImages should NOT be dirty")
+	}
+
+	// debounceGen should reflect the latest event
+	if m.debounceGen != 5 {
+		t.Errorf("debounceGen = %d, want 5", m.debounceGen)
+	}
+
+	// Stale debounce msg (gen=1) should be ignored
+	staleMsg := debounceMsg{gen: 1}
+	newModel, _ := m.Update(staleMsg)
+	m = newModel.(model)
+	if !m.dirtyTabs[tabContainers] {
+		t.Error("Stale debounce should NOT clear dirty tabs")
+	}
+
+	// Current gen debounce msg should clear dirty tabs
+	currentMsg := debounceMsg{gen: m.debounceGen}
+	newModel, _ = m.Update(currentMsg)
+	m = newModel.(model)
+	if len(m.dirtyTabs) != 0 {
+		t.Errorf("After debounce fires, dirtyTabs should be empty, got %v", m.dirtyTabs)
+	}
+}
+
+func TestDebounceMixedEventTypes(t *testing.T) {
+	m := testModel()
+
+	// Mix of event types
+	topics := []string{"/containers/create", "/tasks/start", "/containers/delete", "/images/pull"}
+	for _, topic := range topics {
+		msg := ctr.EventMsg{Namespace: "default", Topic: topic, Timestamp: time.Now()}
+		newModel, _ := m.Update(msg)
+		m = newModel.(model)
+	}
+
+	// Three tab types should be dirty
+	if !m.dirtyTabs[tabContainers] {
+		t.Error("tabContainers should be dirty")
+	}
+	if !m.dirtyTabs[tabTasks] {
+		t.Error("tabTasks should be dirty")
+	}
+	if !m.dirtyTabs[tabImages] {
+		t.Error("tabImages should be dirty")
+	}
+	if m.dirtyTabs[tabSnapshots] {
+		t.Error("tabSnapshots should NOT be dirty")
 	}
 }
 
