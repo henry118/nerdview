@@ -16,6 +16,7 @@ package resource
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -61,15 +62,15 @@ var ImageKind = Kind{
 		{Title: "Size", MinWidth: 10},
 	},
 	ToRows: func(data any, folded map[string]bool) []table.Row {
-		trees, ok := data.([]ctr.ImageTree)
-		if !ok || len(trees) == 0 {
+		trees := toSortedImages(data)
+		if trees == nil {
 			return nil
 		}
 		return BuildTree(imageTreeSpec, trees, folded).Rows
 	},
 	RowID: func(data any, folded map[string]bool, index int) string {
-		trees, ok := data.([]ctr.ImageTree)
-		if !ok || index < 0 {
+		trees := toSortedImages(data)
+		if trees == nil || index < 0 {
 			return ""
 		}
 		result := BuildTree(imageTreeSpec, trees, folded)
@@ -83,8 +84,8 @@ var ImageKind = Kind{
 		return ""
 	},
 	InitFolded: func(data any) map[string]bool {
-		trees, ok := data.([]ctr.ImageTree)
-		if !ok {
+		trees := toSortedImages(data)
+		if trees == nil {
 			return nil
 		}
 		folded := make(map[string]bool)
@@ -92,8 +93,8 @@ var ImageKind = Kind{
 		return folded
 	},
 	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
-		trees, ok := data.([]ctr.ImageTree)
-		if !ok || index < 0 {
+		trees := toSortedImages(data)
+		if trees == nil || index < 0 {
 			return "", ""
 		}
 		result := BuildTree(imageTreeSpec, trees, folded)
@@ -103,8 +104,8 @@ var ImageKind = Kind{
 		return formatImageDetail(result.Nodes[index].Item)
 	},
 	GoToRefs: func(data any, folded map[string]bool) []string {
-		trees, ok := data.([]ctr.ImageTree)
-		if !ok {
+		trees := toSortedImages(data)
+		if trees == nil {
 			return nil
 		}
 		result := BuildTree(imageTreeSpec, trees, folded)
@@ -120,8 +121,8 @@ var ImageKind = Kind{
 
 // ImageSnapshotRef returns the snapshot key for the image row at the given index.
 func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
-	trees, ok := data.([]ctr.ImageTree)
-	if !ok || index < 0 {
+	trees := toSortedImages(data)
+	if trees == nil || index < 0 {
 		return ""
 	}
 	result := BuildTree(imageTreeSpec, trees, folded)
@@ -133,6 +134,19 @@ func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
 		return ""
 	}
 	return node.Item.SnapshotKey
+}
+
+func toSortedImages(data any) []ctr.ImageTree {
+	trees, ok := data.([]ctr.ImageTree)
+	if !ok || len(trees) == 0 {
+		return nil
+	}
+	sorted := make([]ctr.ImageTree, len(trees))
+	copy(sorted, trees)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Desc.Digest.String() < sorted[j].Desc.Digest.String()
+	})
+	return sorted
 }
 
 func countLayers(node ctr.ImageTree) int {
