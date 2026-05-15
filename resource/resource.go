@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/henry118/nerdview/logging"
 	"github.com/henry118/nerdview/ui"
 )
 
@@ -225,6 +226,7 @@ func (t *Tab) RevealRow(match func(row table.Row) bool) int {
 
 	t.Folded = savedFolded
 	if ancestorID != "" {
+		logging.Debug("RevealRow: unfolding ancestor %s", ancestorID)
 		t.Folded[ancestorID] = false
 	}
 	t.refreshRows()

@@ -354,6 +354,7 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			targetTab = tabContainers
 		}
 		if targetKey != "" {
+			logging.Debug("go to: tab %d -> tab %d, key=%s", m.activeRes, targetTab, resource.ShortDigest(targetKey))
 			m.navHistory = append(m.navHistory, navState{
 				tabIndex: m.activeRes,
 				cursor:   idx,

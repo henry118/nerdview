@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/henry118/nerdview/logging"
 )
 
 // DaemonStats holds resource usage metrics for the containerd daemon process.
@@ -39,8 +41,10 @@ func (c *Client) DaemonPID() (int, error) {
 	ctx := context.Background()
 	resp, err := c.inner.IntrospectionService().Server(ctx)
 	if err != nil {
+		logging.Error("failed to get daemon PID via introspection: %v", err)
 		return 0, err
 	}
+	logging.Debug("daemon PID=%d", resp.Pid)
 	return int(resp.Pid), nil
 }
 

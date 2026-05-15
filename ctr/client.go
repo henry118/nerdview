@@ -61,8 +61,11 @@ func New(address string) (*Client, error) {
 // Derived from the socket path; falls back to the default if the address is not a unix path.
 func (c *Client) StateDir() string {
 	if strings.HasPrefix(c.address, "/") {
-		return filepath.Dir(c.address)
+		dir := filepath.Dir(c.address)
+		logging.Debug("state dir derived from socket: %s", dir)
+		return dir
 	}
+	logging.Debug("state dir using default: %s", defaultStateDir)
 	return defaultStateDir
 }
 
@@ -289,8 +292,10 @@ func (c *Client) Tasks(ctx context.Context, ns string) ([]TaskInfo, error) {
 		}
 		result = append(result, info)
 
-		// Fetch exec processes via ListPids
 		execIDs := c.execIDs(ctx, p.ID)
+		if len(execIDs) > 0 {
+			logging.Debug("found %d exec(s) for container %s", len(execIDs), p.ID)
+		}
 		for _, execID := range execIDs {
 			execResp, err := c.inner.TaskService().Get(ctx, &tasks.GetRequest{
 				ContainerID: p.ID,
