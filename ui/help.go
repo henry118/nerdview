@@ -69,8 +69,8 @@ func HelpView(width int, opts ...HelpOption) string {
 	}
 
 	parts := []string{
-		helpKeyStyle.Render("←/→") + helpBarStyle.Render(":resource  "),
-		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":fold/unfold  "),
+		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":tab  "),
+		helpKeyStyle.Render("←/→") + helpBarStyle.Render(":fold  "),
 		helpKeyStyle.Render("n") + helpBarStyle.Render(":namespace  "),
 		helpKeyStyle.Render("s") + helpBarStyle.Render(":snapshotter  "),
 	}

@@ -228,6 +228,69 @@ func TestGoToImageToSnapshot(t *testing.T) {
 	}
 }
 
+func TestTabSwitchForward(t *testing.T) {
+	m := testModel()
+	m.width = 80
+	m.height = 24
+
+	if m.activeRes != tabImages {
+		t.Fatalf("Expected initial tab to be images (%d), got %d", tabImages, m.activeRes)
+	}
+
+	tabKey := tea.KeyMsg{Type: tea.KeyTab}
+
+	newModel, _ := m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabSnapshots {
+		t.Errorf("After 1st Tab: expected %d, got %d", tabSnapshots, m.activeRes)
+	}
+
+	newModel, _ = m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabContainers {
+		t.Errorf("After 2nd Tab: expected %d, got %d", tabContainers, m.activeRes)
+	}
+
+	newModel, _ = m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabTasks {
+		t.Errorf("After 3rd Tab: expected %d, got %d", tabTasks, m.activeRes)
+	}
+
+	newModel, _ = m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabEvents {
+		t.Errorf("After 4th Tab: expected %d, got %d", tabEvents, m.activeRes)
+	}
+
+	// Wraps around
+	newModel, _ = m.Update(tabKey)
+	m = newModel.(model)
+	if m.activeRes != tabImages {
+		t.Errorf("After 5th Tab (wrap): expected %d, got %d", tabImages, m.activeRes)
+	}
+}
+
+func TestTabSwitchBackward(t *testing.T) {
+	m := testModel()
+	m.width = 80
+	m.height = 24
+
+	shiftTabKey := tea.KeyMsg{Type: tea.KeyShiftTab}
+
+	newModel, _ := m.Update(shiftTabKey)
+	m = newModel.(model)
+	if m.activeRes != tabEvents {
+		t.Errorf("After 1st Shift+Tab: expected %d, got %d", tabEvents, m.activeRes)
+	}
+
+	newModel, _ = m.Update(shiftTabKey)
+	m = newModel.(model)
+	if m.activeRes != tabTasks {
+		t.Errorf("After 2nd Shift+Tab: expected %d, got %d", tabTasks, m.activeRes)
+	}
+}
+
 func TestEventsFilteredByNamespace(t *testing.T) {
 	m := testModel()
 

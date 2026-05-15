@@ -163,18 +163,51 @@ func (t *Tab) buildGoToRefs() {
 	t.goToRefs = t.Kind.GoToRefs(t.RawData, t.Folded)
 }
 
-// ToggleFold folds or unfolds the currently selected row.
-func (t *Tab) ToggleFold() {
+// Unfold expands the current row if it's a foldable node that is folded.
+// Returns true if an unfold happened.
+func (t *Tab) Unfold() bool {
 	if t.Kind.RowID == nil || t.RawData == nil {
-		return
+		return false
 	}
 	idx := t.Table.Cursor()
 	id := t.Kind.RowID(t.RawData, t.Folded, idx)
-	if id == "" {
-		return
+	if id == "" || !t.Folded[id] {
+		return false
 	}
-	t.Folded[id] = !t.Folded[id]
+	t.Folded[id] = false
 	t.refreshRows()
+	return true
+}
+
+// Fold collapses the nearest foldable ancestor of the current row.
+// If on a foldable root that is already unfolded, folds it.
+// If on a child, finds and folds the parent root.
+// Returns true if a fold happened.
+func (t *Tab) Fold() bool {
+	if t.Kind.RowID == nil || t.RawData == nil {
+		return false
+	}
+	idx := t.Table.Cursor()
+
+	// If current row is foldable and unfolded, fold it
+	id := t.Kind.RowID(t.RawData, t.Folded, idx)
+	if id != "" && !t.Folded[id] {
+		t.Folded[id] = true
+		t.refreshRows()
+		return true
+	}
+
+	// Otherwise, scan backwards to find nearest foldable ancestor
+	for i := idx - 1; i >= 0; i-- {
+		parentID := t.Kind.RowID(t.RawData, t.Folded, i)
+		if parentID != "" && !t.Folded[parentID] {
+			t.Folded[parentID] = true
+			t.refreshRows()
+			t.Table.SetCursor(i)
+			return true
+		}
+	}
+	return false
 }
 
 // CanFold reports whether this tab supports folding.

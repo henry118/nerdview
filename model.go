@@ -327,10 +327,17 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.resources[m.activeRes].Table.Focus()
 		return m, nil
 
-	case key.Matches(msg, keys.ToggleFold):
+	case key.Matches(msg, keys.Right):
 		tab := m.resources[m.activeRes]
 		if tab.CanFold() {
-			tab.ToggleFold()
+			tab.Unfold()
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.Left):
+		tab := m.resources[m.activeRes]
+		if tab.CanFold() {
+			tab.Fold()
 		}
 		return m, nil
 
