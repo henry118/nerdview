@@ -61,10 +61,10 @@ func (containerKind) Name() string { return "Containers" }
 func (containerKind) Columns() []Column {
 	return []Column{
 		{Title: "ID", MinWidth: 12, Flex: true},
-		{Title: "Type", MinWidth: 8},
-		{Title: "Image", MinWidth: 20, Flex: true},
-		{Title: "Runtime", MinWidth: 16},
-		{Title: "Created", MinWidth: 20},
+		{Title: "TYPE", MinWidth: 8},
+		{Title: "IMAGE", MinWidth: 20, Flex: true},
+		{Title: "RUNTIME", MinWidth: 16},
+		{Title: "CREATED", MinWidth: 20},
 	}
 }
 

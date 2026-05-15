@@ -61,11 +61,11 @@ func (imageKind) Name() string { return "Images" }
 
 func (imageKind) Columns() []Column {
 	return []Column{
-		{Title: "Name", MinWidth: 20, Flex: true},
-		{Title: "Type", MinWidth: 12},
-		{Title: "Digest", MinWidth: 20},
-		{Title: "Layers", MinWidth: 6},
-		{Title: "Size", MinWidth: 10},
+		{Title: "NAME", MinWidth: 20, Flex: true},
+		{Title: "TYPE", MinWidth: 12},
+		{Title: "DIGEST", MinWidth: 20},
+		{Title: "LAYERS", MinWidth: 6},
+		{Title: "SIZE", MinWidth: 10},
 	}
 }
 

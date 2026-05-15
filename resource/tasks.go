@@ -32,12 +32,12 @@ func (taskKind) Name() string { return "Tasks" }
 func (taskKind) Columns() []Column {
 	return []Column{
 		{Title: "ID", MinWidth: 8, Flex: true},
-		{Title: "Container", MinWidth: 8, Flex: true},
-		{Title: "Type", MinWidth: 4},
+		{Title: "CONTAINER", MinWidth: 8, Flex: true},
+		{Title: "TYPE", MinWidth: 4},
 		{Title: "PID", MinWidth: 5},
-		{Title: "Status", MinWidth: 7},
-		{Title: "Cmdline", MinWidth: 10, Flex: true},
-		{Title: "Started", MinWidth: 19, Flex: true},
+		{Title: "STATUS", MinWidth: 7},
+		{Title: "CMDLINE", MinWidth: 10, Flex: true},
+		{Title: "STARTED", MinWidth: 19, Flex: true},
 	}
 }
 

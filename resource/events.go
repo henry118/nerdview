@@ -38,9 +38,9 @@ func (eventKind) Name() string { return "Events" }
 
 func (eventKind) Columns() []Column {
 	return []Column{
-		{Title: "Time", MinWidth: 14},
-		{Title: "Namespace", MinWidth: 14},
-		{Title: "Topic", MinWidth: 20, Flex: true},
+		{Title: "TIME", MinWidth: 14},
+		{Title: "NAMESPACE", MinWidth: 14},
+		{Title: "TOPIC", MinWidth: 20, Flex: true},
 	}
 }
 
