@@ -6,13 +6,18 @@
 
 set -euo pipefail
 
-NERDCTL="/usr/local/bin/nerdctl"
+export PATH="/usr/local/bin:/usr/bin:/opt/containerd/bin:$PATH"
+
+if ! command -v nerdctl &>/dev/null; then
+    echo "Error: nerdctl not found" >&2
+    exit 1
+fi
 COUNT="${1:-100}"
 PARALLEL="${2:-10}"
 IMAGE="alpine:latest"
 
 echo "Pulling image (one-time)..."
-$NERDCTL pull "$IMAGE" >/dev/null 2>&1 || true
+nerdctl pull "$IMAGE" >/dev/null 2>&1 || true
 
 echo "Starting stress test: $COUNT containers, $PARALLEL concurrent"
 echo "Watch nerdview in another terminal to observe debounce behavior."
@@ -20,10 +25,10 @@ echo ""
 
 run_lifecycle() {
     local id
-    id=$($NERDCTL run -d "$IMAGE" sleep 30 2>/dev/null)
+    id=$(nerdctl run -d "$IMAGE" sleep 30 2>/dev/null)
     if [ -n "$id" ]; then
         sleep 5
-        $NERDCTL rm -f "$id" >/dev/null 2>&1 || true
+        nerdctl rm -f "$id" >/dev/null 2>&1 || true
     fi
 }
 
