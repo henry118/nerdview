@@ -28,8 +28,8 @@ images=(
     mongo:latest
     rabbitmq:latest
     traefik:latest
-    vault:latest
-    consul:latest
+    hashicorp/vault:latest
+    hashicorp/consul:latest
     registry:latest
     hello-world:latest
 )
