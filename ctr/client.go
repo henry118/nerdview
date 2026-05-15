@@ -18,6 +18,8 @@ package ctr
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
@@ -35,10 +37,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const defaultStateDir = "/run/containerd"
+
 // Client wraps a containerd gRPC client with convenience methods for
 // fetching resources and subscribing to events.
 type Client struct {
 	inner   *containerd.Client
+	address string
 	eventCh <-chan *events.Envelope
 	errCh   <-chan error
 }
@@ -49,7 +54,16 @@ func New(address string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{inner: c}, nil
+	return &Client{inner: c, address: address}, nil
+}
+
+// StateDir returns the containerd state directory.
+// Derived from the socket path; falls back to the default if the address is not a unix path.
+func (c *Client) StateDir() string {
+	if strings.HasPrefix(c.address, "/") {
+		return filepath.Dir(c.address)
+	}
+	return defaultStateDir
 }
 
 // Close closes the underlying gRPC connection.
@@ -261,10 +275,6 @@ func (c *Client) Tasks(ctx context.Context, ns string) ([]TaskInfo, error) {
 		return nil, err
 	}
 	logging.Debug("loaded %d tasks in ns=%s", len(resp.Tasks), ns)
-	actualNS := namespaces.Default
-	if n, ok := namespaces.Namespace(ctx); ok {
-		actualNS = n
-	}
 	var result []TaskInfo
 	for _, p := range resp.Tasks {
 		info := TaskInfo{ContainerID: p.ID, Process: p}
@@ -274,7 +284,7 @@ func (c *Client) Tasks(ctx context.Context, ns string) ([]TaskInfo, error) {
 		if err == nil {
 			cInfo, err := container.Info(ctx)
 			if err == nil {
-				info.BundlePath = "/run/containerd/" + cInfo.Runtime.Name + "/" + actualNS + "/" + p.ID
+				info.BundlePath = filepath.Join(c.StateDir(), cInfo.Runtime.Name, ns, p.ID)
 			}
 		}
 		result = append(result, info)

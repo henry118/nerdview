@@ -15,8 +15,10 @@
 package ctr
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -32,47 +34,18 @@ type DaemonStats struct {
 	Uptime  time.Duration // Time since process start.
 }
 
-// DaemonPID discovers the containerd daemon's PID from the pidfile or /proc.
+// DaemonPID returns the containerd daemon's PID via the introspection API.
 func (c *Client) DaemonPID() (int, error) {
-	// Try standard pidfile locations
-	for _, path := range []string{
-		"/run/containerd/containerd.pid",
-		"/var/run/containerd/containerd.pid",
-	} {
-		data, err := os.ReadFile(path)
-		if err == nil {
-			pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-			if err == nil {
-				return pid, nil
-			}
-		}
-	}
-	// Fall back: find containerd process in /proc
-	entries, err := os.ReadDir("/proc")
+	ctx := context.Background()
+	resp, err := c.inner.IntrospectionService().Server(ctx)
 	if err != nil {
 		return 0, err
 	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		pid, err := strconv.Atoi(entry.Name())
-		if err != nil {
-			continue
-		}
-		comm, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
-		if err != nil {
-			continue
-		}
-		if strings.TrimSpace(string(comm)) == "containerd" {
-			return pid, nil
-		}
-	}
-	return 0, fmt.Errorf("containerd process not found")
+	return int(resp.Pid), nil
 }
 
 func procStatFields(pid int) ([]string, error) {
-	statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	statData, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +93,7 @@ func ReadDaemonStats(pid int) (DaemonStats, error) {
 	}
 
 	// Read /proc/<pid>/status for VmSize and VmRSS
-	statusData, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
+	statusData, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "status"))
 	if err != nil {
 		return stats, nil
 	}
@@ -148,7 +121,7 @@ func procReadlink(pid uint32, name string) string {
 	if pid == 0 {
 		return ""
 	}
-	target, err := os.Readlink(fmt.Sprintf("/proc/%d/%s", pid, name))
+	target, err := os.Readlink(filepath.Join("/proc", fmt.Sprintf("%d", pid), name))
 	if err != nil {
 		return ""
 	}
@@ -170,7 +143,7 @@ func ProcessCgroup(pid uint32) []string {
 	if pid == 0 {
 		return nil
 	}
-	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	data, err := os.ReadFile(filepath.Join("/proc", fmt.Sprintf("%d", pid), "cgroup"))
 	if err != nil || len(data) == 0 {
 		return nil
 	}
@@ -188,7 +161,7 @@ func ProcessNamespaces(pid uint32) map[string]string {
 	if pid == 0 {
 		return nil
 	}
-	dir := fmt.Sprintf("/proc/%d/ns", pid)
+	dir := filepath.Join("/proc", fmt.Sprintf("%d", pid), "ns")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
@@ -198,7 +171,7 @@ func ProcessNamespaces(pid uint32) map[string]string {
 		if strings.HasSuffix(entry.Name(), "_for_children") {
 			continue
 		}
-		target, err := os.Readlink(dir + "/" + entry.Name())
+		target, err := os.Readlink(filepath.Join(dir, entry.Name()))
 		if err != nil {
 			continue
 		}
@@ -212,7 +185,7 @@ func ProcessCmdline(pid uint32) string {
 	if pid == 0 {
 		return ""
 	}
-	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+	data, err := os.ReadFile(filepath.Join("/proc", fmt.Sprintf("%d", pid), "cmdline"))
 	if err != nil || len(data) == 0 {
 		return ""
 	}

@@ -20,6 +20,25 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+func TestStateDir(t *testing.T) {
+	tests := []struct {
+		address string
+		want    string
+	}{
+		{"/run/containerd/containerd.sock", "/run/containerd"},
+		{"/custom/path/containerd.sock", "/custom/path"},
+		{"/var/run/containerd/containerd.sock", "/var/run/containerd"},
+		{"localhost:1234", defaultStateDir},
+		{"", defaultStateDir},
+	}
+	for _, tt := range tests {
+		c := &Client{address: tt.address}
+		if got := c.StateDir(); got != tt.want {
+			t.Errorf("StateDir(%q) = %q, want %q", tt.address, got, tt.want)
+		}
+	}
+}
+
 func TestIsKnownDescriptor(t *testing.T) {
 	tests := []struct {
 		name string
