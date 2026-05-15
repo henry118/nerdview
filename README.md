@@ -4,20 +4,27 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/henry118/nerdview)](https://goreportcard.com/report/github.com/henry118/nerdview)
 [![License](https://img.shields.io/github/license/henry118/nerdview)](LICENSE)
 
-A terminal UI for [containerd](https://containerd.io/). Browse images, containers, tasks, snapshots, and events in real time.
+A read-only terminal UI for inspecting [containerd](https://containerd.io/) resources. Browse images, containers, tasks, snapshots, and events — without modifying anything.
+
+> **Experimental** — under active development. Keybindings and features may change.
 
 ![screenshot](doc/images/screenshot.png)
 
-## Features
+## Highlights
 
-- **Images** — tree view showing index, platform manifests, and layers (foldable)
-- **Containers** — sandbox/container hierarchy with type column
-- **Tasks** — process info with full OCI runtime spec detail (rootfs, namespaces, cgroups, capabilities, mounts)
-- **Snapshots** — parent-child tree (foldable), snapshotter selection
-- **Events** — live stream of containerd events
-- **Live updates** — subscribes to containerd events, refreshes automatically
-- **Namespace switching** — discover and switch namespaces at runtime
-- **Daemon stats** — real-time CPU, memory, threads, and uptime in the title bar
+- **Read-only** — nerdview only reads from containerd. It will never create, delete, or modify any resources.
+- **Linux only** — currently only implemented and tested on Linux.
+- **Live** — subscribes to containerd events and updates the display automatically.
+
+## What you can see
+
+- **Images** — multi-platform index/manifest tree with layer counts and sizes
+- **Snapshots** — parent-child chain with snapshotter selection
+- **Containers** — sandbox/container grouping with runtime spec inspection
+- **Tasks** — running processes including exec sessions, with PID, cmdline, cgroups, and namespaces
+- **Events** — live stream of containerd lifecycle events
+
+Navigate between related resources (e.g., jump from a container to its snapshot chain) and switch namespaces at runtime.
 
 ## Install
 
@@ -32,27 +39,34 @@ Requires Go 1.26+.
 ## Usage
 
 ```bash
-sudo ./nerdview                        # default namespace
-sudo ./nerdview -n k8s.io              # specify namespace
+sudo ./nerdview                              # default namespace
+sudo ./nerdview -n k8s.io                    # specify namespace
 CONTAINERD_ADDRESS=/path/to/sock ./nerdview  # custom socket
 ```
 
-The binary needs access to the containerd socket (default: `/run/containerd/containerd.sock`).
+Root (or equivalent) access is typically needed to reach the containerd socket.
 
 ## Key Bindings
 
 | Key | Action |
 |-----|--------|
-| `Tab` / `←` / `→` | Switch resource tab |
-| `j` / `↓` | Move cursor down |
-| `k` / `↑` | Move cursor up |
-| `Space` | Fold/unfold tree node |
-| `Enter` | Open detail dialog |
-| `n` | Select namespace |
-| `s` | Select snapshotter |
-| `Esc` | Close dialog / quit |
-| `Ctrl+C` | Force quit |
+| Tab / Shift+Tab | Next / previous tab |
+| → / l | Unfold tree node |
+| ← / h | Fold tree node |
+| j / ↓ | Move down |
+| k / ↑ | Move up |
+| Enter | Detail popup |
+| p | Runtime spec (containers) |
+| g | Go to related resource |
+| b | Go back |
+| n | Switch namespace |
+| s | Switch snapshotter |
+| q / Esc | Quit |
+
+## Status
+
+This project is experimental. Contributions and bug reports are welcome.
 
 ## License
 
-See [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE).
