@@ -20,6 +20,16 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 )
 
+// Tree display characters for hierarchical views.
+const (
+	IconFolded   = "▸ "
+	IconUnfolded = "▾ "
+	ConnMid      = "├─ "
+	ConnLast     = "└─ "
+	ConnPipe     = "│  "
+	ConnBlank    = "   "
+)
+
 // TreeNode represents one visible node in a rendered tree.
 type TreeNode[T any] struct {
 	Item        T

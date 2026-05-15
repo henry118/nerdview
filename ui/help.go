@@ -20,21 +20,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	helpBarStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorSubtext0)).
-			Background(lipgloss.Color(ColorBase))
-
-	helpKeyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorTeal)).
-			Background(lipgloss.Color(ColorBase)).
-			Bold(true)
-
-	helpPosStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorOverlay0)).
-			Background(lipgloss.Color(ColorBase))
-)
-
 // HelpOption configures the help bar.
 type HelpOption func(*helpConfig)
 
@@ -45,18 +30,22 @@ type helpConfig struct {
 	position  string
 }
 
+// WithGoTo shows the "go to" hint with the given target label (e.g. "sn", "ctr").
 func WithGoTo(label string) HelpOption {
 	return func(c *helpConfig) { c.goToLabel = label }
 }
 
+// WithBack shows the "back" navigation hint.
 func WithBack() HelpOption {
 	return func(c *helpConfig) { c.showBack = true }
 }
 
+// WithSpec shows the "spec" hint for viewing runtime specs.
 func WithSpec() HelpOption {
 	return func(c *helpConfig) { c.showSpec = true }
 }
 
+// WithPosition shows a right-aligned row position indicator (e.g. "3/47").
 func WithPosition(pos string) HelpOption {
 	return func(c *helpConfig) { c.position = pos }
 }
@@ -69,38 +58,38 @@ func HelpView(width int, opts ...HelpOption) string {
 	}
 
 	parts := []string{
-		helpKeyStyle.Render("Tab") + helpBarStyle.Render(":tab  "),
-		helpKeyStyle.Render("←/→") + helpBarStyle.Render(":fold  "),
-		helpKeyStyle.Render("n") + helpBarStyle.Render(":namespace  "),
-		helpKeyStyle.Render("s") + helpBarStyle.Render(":snapshotter  "),
+		StyleHelpKey.Render("Tab") + StyleHelpBar.Render(":tab  "),
+		StyleHelpKey.Render("←/→") + StyleHelpBar.Render(":fold  "),
+		StyleHelpKey.Render("n") + StyleHelpBar.Render(":namespace  "),
+		StyleHelpKey.Render("s") + StyleHelpBar.Render(":snapshotter  "),
 	}
 	if cfg.goToLabel != "" {
-		parts = append(parts, helpKeyStyle.Render("g")+helpBarStyle.Render(":go to "+cfg.goToLabel+"  "))
+		parts = append(parts, StyleHelpKey.Render("g")+StyleHelpBar.Render(":go to "+cfg.goToLabel+"  "))
 	}
 	if cfg.showBack {
-		parts = append(parts, helpKeyStyle.Render("b")+helpBarStyle.Render(":back  "))
+		parts = append(parts, StyleHelpKey.Render("b")+StyleHelpBar.Render(":back  "))
 	}
 	if cfg.showSpec {
-		parts = append(parts, helpKeyStyle.Render("p")+helpBarStyle.Render(":spec  "))
+		parts = append(parts, StyleHelpKey.Render("p")+StyleHelpBar.Render(":spec  "))
 	}
 	parts = append(parts,
-		helpKeyStyle.Render("Enter")+helpBarStyle.Render(":detail  "),
-		helpKeyStyle.Render("q/Esc")+helpBarStyle.Render(":quit"),
+		StyleHelpKey.Render("Enter")+StyleHelpBar.Render(":detail  "),
+		StyleHelpKey.Render("q/Esc")+StyleHelpBar.Render(":quit"),
 	)
 	text := strings.Join(parts, "")
 	textWidth := lipgloss.Width(text)
 
 	if cfg.position != "" {
-		posText := helpPosStyle.Render(cfg.position)
+		posText := StyleHelpPos.Render(cfg.position)
 		posWidth := lipgloss.Width(posText)
 		gap := width - textWidth - posWidth
 		if gap > 0 {
-			text += helpBarStyle.Render(strings.Repeat(" ", gap)) + posText
+			text += StyleHelpBar.Render(strings.Repeat(" ", gap)) + posText
 		} else {
 			text += " " + posText
 		}
 	} else if width > textWidth {
-		text += helpBarStyle.Render(strings.Repeat(" ", width-textWidth))
+		text += StyleHelpBar.Render(strings.Repeat(" ", width-textWidth))
 	}
 	return text
 }

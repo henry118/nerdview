@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
+	ctdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/henry118/nerdview/ctr"
 )
 
@@ -52,75 +53,31 @@ var imageTreeSpec = TreeSpec[ctr.ImageTree]{
 	},
 }
 
-var ImageKind = Kind{
-	Name: "Images",
-	Columns: []Column{
+type imageKind struct{}
+
+var ImageKind Kind = imageKind{}
+
+func (imageKind) Name() string { return "Images" }
+
+func (imageKind) Columns() []Column {
+	return []Column{
 		{Title: "Name", MinWidth: 20, Flex: true},
 		{Title: "Type", MinWidth: 12},
 		{Title: "Digest", MinWidth: 20},
 		{Title: "Layers", MinWidth: 6},
 		{Title: "Size", MinWidth: 10},
-	},
-	ToRows: func(data any, folded map[string]bool) []table.Row {
-		trees := toSortedImages(data)
-		if trees == nil {
-			return nil
-		}
-		return BuildTree(imageTreeSpec, trees, folded).Rows
-	},
-	RowID: func(data any, folded map[string]bool, index int) string {
-		trees := toSortedImages(data)
-		if trees == nil || index < 0 {
-			return ""
-		}
-		result := BuildTree(imageTreeSpec, trees, folded)
-		if index >= len(result.Nodes) {
-			return ""
-		}
-		node := result.Nodes[index]
-		if node.HasChildren {
-			return node.ID
-		}
-		return ""
-	},
-	InitFolded: func(data any) map[string]bool {
-		trees := toSortedImages(data)
-		if trees == nil {
-			return nil
-		}
-		folded := make(map[string]bool)
-		DefaultFoldState(imageTreeSpec, trees, folded)
-		return folded
-	},
-	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
-		trees := toSortedImages(data)
-		if trees == nil || index < 0 {
-			return "", ""
-		}
-		result := BuildTree(imageTreeSpec, trees, folded)
-		if index >= len(result.Nodes) {
-			return "", ""
-		}
-		return formatImageDetail(result.Nodes[index].Item)
-	},
-	GoToRefs: func(data any, folded map[string]bool) []string {
-		trees := toSortedImages(data)
-		if trees == nil {
-			return nil
-		}
-		result := BuildTree(imageTreeSpec, trees, folded)
-		refs := make([]string, len(result.Nodes))
-		for i, node := range result.Nodes {
-			if node.HasChildren {
-				refs[i] = node.Item.SnapshotKey
-			}
-		}
-		return refs
-	},
+	}
 }
 
-// ImageSnapshotRef returns the snapshot key for the image row at the given index.
-func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
+func (imageKind) Rows(data any, folded map[string]bool) []table.Row {
+	trees := toSortedImages(data)
+	if trees == nil {
+		return nil
+	}
+	return BuildTree(imageTreeSpec, trees, folded).Rows
+}
+
+func (imageKind) FoldKey(data any, folded map[string]bool, index int) string {
 	trees := toSortedImages(data)
 	if trees == nil || index < 0 {
 		return ""
@@ -130,10 +87,47 @@ func ImageSnapshotRef(data any, folded map[string]bool, index int) string {
 		return ""
 	}
 	node := result.Nodes[index]
-	if !node.HasChildren {
-		return ""
+	if node.HasChildren {
+		return node.ID
 	}
-	return node.Item.SnapshotKey
+	return ""
+}
+
+func (imageKind) InitFolded(data any) map[string]bool {
+	trees := toSortedImages(data)
+	if trees == nil {
+		return nil
+	}
+	folded := make(map[string]bool)
+	DefaultFoldState(imageTreeSpec, trees, folded)
+	return folded
+}
+
+func (imageKind) Detail(data any, folded map[string]bool, index int) (string, string) {
+	trees := toSortedImages(data)
+	if trees == nil || index < 0 {
+		return "", ""
+	}
+	result := BuildTree(imageTreeSpec, trees, folded)
+	if index >= len(result.Nodes) {
+		return "", ""
+	}
+	return formatImageDetail(result.Nodes[index].Item)
+}
+
+func (imageKind) CrossRefs(data any, folded map[string]bool) []string {
+	trees := toSortedImages(data)
+	if trees == nil {
+		return nil
+	}
+	result := BuildTree(imageTreeSpec, trees, folded)
+	refs := make([]string, len(result.Nodes))
+	for i, node := range result.Nodes {
+		if node.HasChildren {
+			refs[i] = node.Item.SnapshotKey
+		}
+	}
+	return refs
 }
 
 func toSortedImages(data any) []ctr.ImageTree {
@@ -152,8 +146,7 @@ func toSortedImages(data any) []ctr.ImageTree {
 func countLayers(node ctr.ImageTree) int {
 	count := 0
 	for _, child := range node.Children {
-		mt := shortMediaType(child.Desc.MediaType)
-		if strings.HasPrefix(mt, "layer") {
+		if ctdimages.IsLayerType(child.Desc.MediaType) {
 			count++
 		} else {
 			count += countLayers(child)
@@ -183,27 +176,21 @@ func descLabel(node ctr.ImageTree) string {
 }
 
 func shortMediaType(mt string) string {
-	switch mt {
-	case "application/vnd.oci.image.index.v1+json":
+	switch {
+	case ctdimages.IsIndexType(mt):
 		return "index"
-	case "application/vnd.oci.image.manifest.v1+json":
+	case ctdimages.IsManifestType(mt):
 		return "manifest"
-	case "application/vnd.oci.image.config.v1+json":
+	case ctdimages.IsConfigType(mt):
 		return "config"
-	case "application/vnd.oci.image.layer.v1.tar+gzip":
-		return "layer/gzip"
-	case "application/vnd.oci.image.layer.v1.tar+zstd":
-		return "layer/zstd"
-	case "application/vnd.oci.image.layer.v1.tar":
+	case ctdimages.IsLayerType(mt):
+		if i := strings.LastIndexByte(mt, '+'); i >= 0 {
+			return "layer/" + mt[i+1:]
+		}
+		if i := strings.LastIndex(mt, ".tar."); i >= 0 {
+			return "layer/" + mt[i+5:]
+		}
 		return "layer"
-	case "application/vnd.docker.distribution.manifest.v2+json":
-		return "manifest"
-	case "application/vnd.docker.distribution.manifest.list.v2+json":
-		return "index"
-	case "application/vnd.docker.image.rootfs.diff.tar.gzip":
-		return "layer/gzip"
-	case "application/vnd.docker.container.image.v1+json":
-		return "config"
 	default:
 		if idx := strings.LastIndex(mt, "."); idx >= 0 {
 			return mt[idx+1:]

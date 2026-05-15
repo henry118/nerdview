@@ -15,11 +15,13 @@
 package resource
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/henry118/nerdview/ctr"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func testContainers() []ctr.ContainerInfo {
@@ -93,7 +95,7 @@ func TestContainerTreeNodes(t *testing.T) {
 
 func TestContainerKindToRows_Unfolded(t *testing.T) {
 	data := testContainers()
-	rows := ContainerKind.ToRows(data, nil)
+	rows := ContainerKind.Rows(data, nil)
 
 	// sandbox (1) + 2 children + standalone (1) = 4
 	if len(rows) != 4 {
@@ -128,7 +130,7 @@ func TestContainerKindToRows_Unfolded(t *testing.T) {
 func TestContainerKindToRows_Folded(t *testing.T) {
 	data := testContainers()
 	folded := map[string]bool{"sandbox-abc": true}
-	rows := ContainerKind.ToRows(data, folded)
+	rows := ContainerKind.Rows(data, folded)
 
 	// sandbox folded (1) + standalone (1) = 2
 	if len(rows) != 2 {
@@ -144,51 +146,150 @@ func TestContainerKindRowID(t *testing.T) {
 	folded := map[string]bool{}
 
 	// Index 0 is sandbox with children
-	id := ContainerKind.RowID(data, folded, 0)
+	id := ContainerKind.FoldKey(data, folded, 0)
 	if id != "sandbox-abc" {
 		t.Errorf("RowID index 0 = %q, want %q", id, "sandbox-abc")
 	}
 
 	// Index 3 is standalone (no children)
-	id = ContainerKind.RowID(data, folded, 3)
+	id = ContainerKind.FoldKey(data, folded, 3)
 	if id != "" {
 		t.Errorf("RowID index 3 (standalone) = %q, want empty", id)
 	}
 }
 
-func TestContainerSnapshotRef(t *testing.T) {
+func TestContainerKindDetail(t *testing.T) {
 	data := testContainers()
-	folded := map[string]bool{}
 
-	// Index 0 = sandbox-abc
-	if got := ContainerSnapshotRef(data, folded, 0); got != "sha256:sandbox-snap" {
-		t.Errorf("ContainerSnapshotRef(0) = %q, want %q", got, "sha256:sandbox-snap")
+	title, body := ContainerKind.Detail(data, nil, 0)
+	if title != "sandbox-abc" {
+		t.Errorf("Title = %q, want %q", title, "sandbox-abc")
 	}
-
-	// Index 1 = app-container-1 (child)
-	if got := ContainerSnapshotRef(data, folded, 1); got != "sha256:app1-snap" {
-		t.Errorf("ContainerSnapshotRef(1) = %q, want %q", got, "sha256:app1-snap")
+	if !strings.Contains(body, "Type:        sandbox") {
+		t.Error("Should show type as sandbox")
 	}
-
-	// Index 3 = standalone-ctr (no snapshot key)
-	if got := ContainerSnapshotRef(data, folded, 3); got != "" {
-		t.Errorf("ContainerSnapshotRef(3) = %q, want empty", got)
-	}
-
-	// When sandbox is folded, index 1 = standalone-ctr
-	foldedMap := map[string]bool{"sandbox-abc": true}
-	if got := ContainerSnapshotRef(data, foldedMap, 1); got != "" {
-		t.Errorf("ContainerSnapshotRef(1, folded) = %q, want empty", got)
-	}
-
-	// Out of bounds
-	if got := ContainerSnapshotRef(data, folded, 99); got != "" {
-		t.Errorf("ContainerSnapshotRef(99) = %q, want empty", got)
-	}
-
-	// Nil data
-	if got := ContainerSnapshotRef(nil, folded, 0); got != "" {
-		t.Errorf("ContainerSnapshotRef(nil) = %q, want empty", got)
+	if !strings.Contains(body, "SnapshotKey: sha256:sandbox-snap") {
+		t.Error("Should show snapshot key")
 	}
 }
 
+func TestContainerKindNameAndColumns(t *testing.T) {
+	if ContainerKind.Name() != "Containers" {
+		t.Errorf("Name = %q, want %q", ContainerKind.Name(), "Containers")
+	}
+	cols := ContainerKind.Columns()
+	if len(cols) != 5 {
+		t.Errorf("Expected 5 columns, got %d", len(cols))
+	}
+}
+
+func TestContainerKindDetail_WithLabels(t *testing.T) {
+	data := []ctr.ContainerInfo{
+		{
+			Container: containers.Container{
+				ID:        "labeled-ctr",
+				Image:     "nginx",
+				Runtime:   containers.RuntimeInfo{Name: "runc"},
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+				SandboxID: "labeled-ctr",
+				Labels:    map[string]string{"env": "prod", "app": "web"},
+			},
+			IsSandbox: true,
+		},
+	}
+
+	_, body := ContainerKind.Detail(data, nil, 0)
+	if !strings.Contains(body, "SandboxID:   labeled-ctr") {
+		t.Error("Should contain SandboxID")
+	}
+	if !strings.Contains(body, "env: prod") {
+		t.Error("Should contain labels")
+	}
+	if !strings.Contains(body, "Type:        sandbox") {
+		t.Error("Should show type as sandbox")
+	}
+}
+
+func TestContainerSpec(t *testing.T) {
+	// No spec
+	data := testContainers()
+	title, body := ContainerSpec(data, nil, 0)
+	if title != "" || body != "" {
+		t.Errorf("Expected empty for container without spec, got title=%q", title)
+	}
+
+	// Out of bounds
+	title, body = ContainerSpec(data, nil, 99)
+	if title != "" || body != "" {
+		t.Error("Expected empty for out of bounds")
+	}
+
+	// Nil data
+	title, body = ContainerSpec(nil, nil, 0)
+	if title != "" || body != "" {
+		t.Error("Expected empty for nil data")
+	}
+}
+
+func TestContainerKindInitFolded(t *testing.T) {
+	data := testContainers()
+	folded := ContainerKind.InitFolded(data)
+	if folded != nil {
+		t.Errorf("Containers InitFolded should be nil, got %v", folded)
+	}
+}
+
+func TestContainerSpec_WithSpec(t *testing.T) {
+	data := []ctr.ContainerInfo{
+		{
+			Container: containers.Container{
+				ID:        "spec-ctr",
+				Image:     "nginx",
+				Runtime:   containers.RuntimeInfo{Name: "runc"},
+				CreatedAt: time.Now(),
+			},
+			Spec: &specs.Spec{
+				Hostname: "test-host",
+				Root:     &specs.Root{Path: "/rootfs"},
+			},
+		},
+	}
+	title, body := ContainerSpec(data, nil, 0)
+	if title != "spec-ctr" {
+		t.Errorf("Title = %q, want %q", title, "spec-ctr")
+	}
+	if !strings.Contains(body, "test-host") {
+		t.Error("Should contain hostname from spec JSON")
+	}
+}
+
+func TestContainerKind_NilData(t *testing.T) {
+	if rows := ContainerKind.Rows(nil, nil); rows != nil {
+		t.Error("Rows(nil) should be nil")
+	}
+	if id := ContainerKind.FoldKey(nil, nil, 0); id != "" {
+		t.Error("FoldKey(nil) should be empty")
+	}
+	if _, body := ContainerKind.Detail(nil, nil, 0); body != "" {
+		t.Error("Detail(nil) should be empty")
+	}
+	if refs := ContainerKind.CrossRefs(nil, nil); refs != nil {
+		t.Error("CrossRefs(nil) should be nil")
+	}
+}
+
+func TestContainerKindCrossRefs(t *testing.T) {
+	data := testContainers()
+	refs := ContainerKind.CrossRefs(data, nil)
+
+	if len(refs) != 4 {
+		t.Fatalf("Expected 4 refs, got %d", len(refs))
+	}
+	if refs[0] != "sha256:sandbox-snap" {
+		t.Errorf("CrossRef[0] = %q, want %q", refs[0], "sha256:sandbox-snap")
+	}
+	if refs[3] != "" {
+		t.Errorf("CrossRef[3] = %q, want empty (standalone has no snapshot key)", refs[3])
+	}
+}

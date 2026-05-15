@@ -23,26 +23,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestTaskContainerRef(t *testing.T) {
-	data := []ctr.TaskInfo{
-		{ContainerID: "container-1", Process: &tasktypes.Process{ID: "container-1", Pid: 1234, Status: tasktypes.Status_RUNNING}},
-		{ContainerID: "container-2", Process: &tasktypes.Process{ID: "container-2", Pid: 5678, Status: tasktypes.Status_STOPPED}},
-	}
-
-	if got := TaskContainerRef(data, nil, 0); got != "container-1" {
-		t.Errorf("TaskContainerRef(0) = %q, want %q", got, "container-1")
-	}
-	if got := TaskContainerRef(data, nil, 1); got != "container-2" {
-		t.Errorf("TaskContainerRef(1) = %q, want %q", got, "container-2")
-	}
-	if got := TaskContainerRef(data, nil, 99); got != "" {
-		t.Errorf("TaskContainerRef(99) = %q, want empty", got)
-	}
-	if got := TaskContainerRef(nil, nil, 0); got != "" {
-		t.Errorf("TaskContainerRef(nil) = %q, want empty", got)
-	}
-}
-
 func TestTaskKindToRows(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
@@ -65,7 +45,7 @@ func TestTaskKindToRows(t *testing.T) {
 		},
 	}
 
-	rows := TaskKind.ToRows(data, nil)
+	rows := TaskKind.Rows(data, nil)
 
 	if len(rows) != 2 {
 		t.Fatalf("Expected 2 rows, got %d", len(rows))
@@ -116,7 +96,7 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 		},
 	}
 
-	title, body := TaskKind.ToDetail(data, nil, 0)
+	title, body := TaskKind.Detail(data, nil, 0)
 
 	if title != "my-container" {
 		t.Errorf("Title = %q, want %q", title, "my-container")
@@ -148,7 +128,7 @@ func TestTaskKindToDetail_Exec(t *testing.T) {
 		},
 	}
 
-	title, body := TaskKind.ToDetail(data, nil, 0)
+	title, body := TaskKind.Detail(data, nil, 0)
 
 	if title != "my-exec" {
 		t.Errorf("Title = %q, want %q", title, "my-exec")
@@ -175,12 +155,63 @@ func TestTaskKindToDetail_Stopped(t *testing.T) {
 		},
 	}
 
-	_, body := TaskKind.ToDetail(data, nil, 0)
+	_, body := TaskKind.Detail(data, nil, 0)
 
 	if !strings.Contains(body, "Exit Status:  137") {
 		t.Error("Stopped task should show exit status")
 	}
 	if !strings.Contains(body, "Exited At:") {
 		t.Error("Stopped task should show exited_at time")
+	}
+}
+
+func TestTaskKindNameAndColumns(t *testing.T) {
+	if TaskKind.Name() != "Tasks" {
+		t.Errorf("Name = %q, want %q", TaskKind.Name(), "Tasks")
+	}
+	cols := TaskKind.Columns()
+	if len(cols) != 7 {
+		t.Errorf("Expected 7 columns, got %d", len(cols))
+	}
+}
+
+func TestTaskKindCrossRefs(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
+		{ContainerID: "ctr-2", Process: &tasktypes.Process{ID: "exec-1", Pid: 2}, ExecID: "exec-1"},
+	}
+	refs := TaskKind.CrossRefs(data, nil)
+	if len(refs) != 2 {
+		t.Fatalf("Expected 2 refs, got %d", len(refs))
+	}
+	if refs[0] != "ctr-1" {
+		t.Errorf("CrossRef[0] = %q, want %q", refs[0], "ctr-1")
+	}
+	if refs[1] != "ctr-2" {
+		t.Errorf("CrossRef[1] = %q, want %q", refs[1], "ctr-2")
+	}
+}
+
+func TestTaskKind_NilData(t *testing.T) {
+	if rows := TaskKind.Rows(nil, nil); rows != nil {
+		t.Error("Rows(nil) should be nil")
+	}
+	if _, body := TaskKind.Detail(nil, nil, 0); body != "" {
+		t.Error("Detail(nil) should be empty")
+	}
+	if refs := TaskKind.CrossRefs(nil, nil); refs != nil {
+		t.Error("CrossRefs(nil) should be nil")
+	}
+}
+
+func TestTaskKindFoldKeyAndInitFolded(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
+	}
+	if got := TaskKind.FoldKey(data, nil, 0); got != "" {
+		t.Errorf("Tasks should not be foldable, got %q", got)
+	}
+	if got := TaskKind.InitFolded(data); got != nil {
+		t.Errorf("Tasks InitFolded should be nil, got %v", got)
 	}
 }

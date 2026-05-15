@@ -20,59 +20,21 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func TestKnownMediaTypes(t *testing.T) {
-	known := []string{
-		"application/vnd.oci.image.index.v1+json",
-		"application/vnd.oci.image.manifest.v1+json",
-		"application/vnd.oci.image.config.v1+json",
-		"application/vnd.oci.image.layer.v1.tar+gzip",
-		"application/vnd.oci.image.layer.v1.tar+zstd",
-		"application/vnd.oci.image.layer.v1.tar",
-		"application/vnd.docker.distribution.manifest.v2+json",
-		"application/vnd.docker.distribution.manifest.list.v2+json",
-		"application/vnd.docker.container.image.v1+json",
-		"application/vnd.docker.image.rootfs.diff.tar.gzip",
+func TestStateDir(t *testing.T) {
+	tests := []struct {
+		address string
+		want    string
+	}{
+		{"/run/containerd/containerd.sock", "/run/containerd"},
+		{"/custom/path/containerd.sock", "/custom/path"},
+		{"/var/run/containerd/containerd.sock", "/var/run/containerd"},
+		{"localhost:1234", defaultStateDir},
+		{"", defaultStateDir},
 	}
-	for _, mt := range known {
-		if !knownMediaTypes[mt] {
-			t.Errorf("expected %q to be a known media type", mt)
-		}
-	}
-
-	unknown := []string{
-		"unknown/unknown",
-		"application/vnd.oci.artifact.manifest.v1+json",
-		"application/octet-stream",
-	}
-	for _, mt := range unknown {
-		if knownMediaTypes[mt] {
-			t.Errorf("expected %q to NOT be a known media type", mt)
-		}
-	}
-}
-
-func TestIsManifestType(t *testing.T) {
-	manifests := []string{
-		"application/vnd.oci.image.index.v1+json",
-		"application/vnd.oci.image.manifest.v1+json",
-		"application/vnd.docker.distribution.manifest.v2+json",
-		"application/vnd.docker.distribution.manifest.list.v2+json",
-	}
-	for _, mt := range manifests {
-		if !isManifestType(mt) {
-			t.Errorf("expected %q to be a manifest type", mt)
-		}
-	}
-
-	nonManifests := []string{
-		"application/vnd.oci.image.config.v1+json",
-		"application/vnd.oci.image.layer.v1.tar+gzip",
-		"application/vnd.docker.image.rootfs.diff.tar.gzip",
-		"",
-	}
-	for _, mt := range nonManifests {
-		if isManifestType(mt) {
-			t.Errorf("expected %q to NOT be a manifest type", mt)
+	for _, tt := range tests {
+		c := &Client{address: tt.address}
+		if got := c.StateDir(); got != tt.want {
+			t.Errorf("StateDir(%q) = %q, want %q", tt.address, got, tt.want)
 		}
 	}
 }

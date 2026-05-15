@@ -18,11 +18,13 @@ package ctr
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 
-	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	tasktypes "github.com/containerd/containerd/api/types/task"
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
+	tasktypes "github.com/containerd/containerd/api/types/task"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
@@ -35,10 +37,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const defaultStateDir = "/run/containerd"
+
 // Client wraps a containerd gRPC client with convenience methods for
 // fetching resources and subscribing to events.
 type Client struct {
 	inner   *containerd.Client
+	address string
 	eventCh <-chan *events.Envelope
 	errCh   <-chan error
 }
@@ -49,7 +54,19 @@ func New(address string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{inner: c}, nil
+	return &Client{inner: c, address: address}, nil
+}
+
+// StateDir returns the containerd state directory.
+// Derived from the socket path; falls back to the default if the address is not a unix path.
+func (c *Client) StateDir() string {
+	if strings.HasPrefix(c.address, "/") {
+		dir := filepath.Dir(c.address)
+		logging.Debug("state dir derived from socket: %s", dir)
+		return dir
+	}
+	logging.Debug("state dir using default: %s", defaultStateDir)
+	return defaultStateDir
 }
 
 // Close closes the underlying gRPC connection.
@@ -185,41 +202,16 @@ func (c *Client) ImageTrees(ctx context.Context, ns, snapshotter string) ([]Imag
 	return trees, nil
 }
 
-var knownMediaTypes = map[string]bool{
-	"application/vnd.oci.image.index.v1+json":                  true,
-	"application/vnd.oci.image.manifest.v1+json":               true,
-	"application/vnd.oci.image.config.v1+json":                 true,
-	"application/vnd.oci.image.layer.v1.tar":                   true,
-	"application/vnd.oci.image.layer.v1.tar+gzip":              true,
-	"application/vnd.oci.image.layer.v1.tar+zstd":              true,
-	"application/vnd.oci.image.layer.nondistributable.v1.tar":  true,
-	"application/vnd.oci.image.layer.nondistributable.v1.tar+gzip": true,
-	"application/vnd.docker.distribution.manifest.v2+json":     true,
-	"application/vnd.docker.distribution.manifest.list.v2+json": true,
-	"application/vnd.docker.container.image.v1+json":           true,
-	"application/vnd.docker.image.rootfs.diff.tar.gzip":        true,
-}
-
 func isKnownDescriptor(desc ocispec.Descriptor) bool {
 	if desc.Platform != nil && desc.Platform.OS == "unknown" {
 		return false
 	}
-	if knownMediaTypes[desc.MediaType] {
+	mt := desc.MediaType
+	if images.IsManifestType(mt) || images.IsIndexType(mt) || images.IsLayerType(mt) || images.IsConfigType(mt) {
 		return true
 	}
 	// OCI index entries may omit MediaType; accept if they have a valid platform
-	if desc.MediaType == "" && desc.Platform != nil {
-		return true
-	}
-	return false
-}
-
-func isManifestType(mediaType string) bool {
-	switch mediaType {
-	case "application/vnd.oci.image.index.v1+json",
-		"application/vnd.oci.image.manifest.v1+json",
-		"application/vnd.docker.distribution.manifest.v2+json",
-		"application/vnd.docker.distribution.manifest.list.v2+json":
+	if mt == "" && desc.Platform != nil {
 		return true
 	}
 	return false
@@ -240,7 +232,7 @@ func walkContent(ctx context.Context, store content.Store, snLabel string, desc 
 			Children: walkContent(ctx, store, snLabel, child),
 		}
 		// Skip manifests that have no children (content not downloaded)
-		if isManifestType(child.MediaType) && len(node.Children) == 0 {
+		if (images.IsManifestType(child.MediaType) || images.IsIndexType(child.MediaType)) && len(node.Children) == 0 {
 			continue
 		}
 		// Read content info labels for snapshot cross-reference.
@@ -275,10 +267,10 @@ type TaskInfo struct {
 	Cmdline     string
 }
 
-// TasksWithSpec returns all tasks in the namespace, each enriched with the
+// Tasks returns all tasks in the namespace, each enriched with the
 // container's OCI runtime spec and computed bundle path. Exec processes are
 // included as separate entries with ExecID set.
-func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, error) {
+func (c *Client) Tasks(ctx context.Context, ns string) ([]TaskInfo, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	resp, err := c.inner.TaskService().List(ctx, &tasks.ListTasksRequest{})
 	if err != nil {
@@ -286,10 +278,6 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 		return nil, err
 	}
 	logging.Debug("loaded %d tasks in ns=%s", len(resp.Tasks), ns)
-	actualNS := namespaces.Default
-	if n, ok := namespaces.Namespace(ctx); ok {
-		actualNS = n
-	}
 	var result []TaskInfo
 	for _, p := range resp.Tasks {
 		info := TaskInfo{ContainerID: p.ID, Process: p}
@@ -299,13 +287,15 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 		if err == nil {
 			cInfo, err := container.Info(ctx)
 			if err == nil {
-				info.BundlePath = "/run/containerd/" + cInfo.Runtime.Name + "/" + actualNS + "/" + p.ID
+				info.BundlePath = filepath.Join(c.StateDir(), cInfo.Runtime.Name, ns, p.ID)
 			}
 		}
 		result = append(result, info)
 
-		// Fetch exec processes via ListPids
-		execIDs := c.listExecIDs(ctx, p.ID)
+		execIDs := c.execIDs(ctx, p.ID)
+		if len(execIDs) > 0 {
+			logging.Debug("found %d exec(s) for container %s", len(execIDs), p.ID)
+		}
 		for _, execID := range execIDs {
 			execResp, err := c.inner.TaskService().Get(ctx, &tasks.GetRequest{
 				ContainerID: p.ID,
@@ -326,7 +316,7 @@ func (c *Client) TasksWithSpec(ctx context.Context, ns string) ([]TaskInfo, erro
 	return result, nil
 }
 
-func (c *Client) listExecIDs(ctx context.Context, containerID string) []string {
+func (c *Client) execIDs(ctx context.Context, containerID string) []string {
 	resp, err := c.inner.TaskService().ListPids(ctx, &tasks.ListPidsRequest{
 		ContainerID: containerID,
 	})
@@ -348,8 +338,6 @@ func (c *Client) listExecIDs(ctx context.Context, containerID string) []string {
 	}
 	return execIDs
 }
-
-
 
 // Snapshotters returns the names of all available snapshotter plugins.
 func (c *Client) Snapshotters(ctx context.Context) ([]string, error) {

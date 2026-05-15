@@ -38,55 +38,68 @@ var snapshotTreeSpec = TreeSpec[snapshots.Info]{
 	},
 }
 
-var SnapshotKind = Kind{
-	Name: "Snapshots",
-	Columns: []Column{
+type snapshotKind struct{}
+
+var SnapshotKind Kind = snapshotKind{}
+
+func (snapshotKind) Name() string { return "Snapshots" }
+
+func (snapshotKind) Columns() []Column {
+	return []Column{
 		{Title: "Name", MinWidth: 20, Flex: true},
 		{Title: "Kind", MinWidth: 10},
 		{Title: "Created", MinWidth: 20},
-	},
-	ToRows: func(data any, folded map[string]bool) []table.Row {
-		infos, ok := data.([]snapshots.Info)
-		if !ok || len(infos) == 0 {
-			return nil
-		}
-		return BuildTree(snapshotTreeSpec, infos, folded).Rows
-	},
-	RowID: func(data any, folded map[string]bool, index int) string {
-		infos, ok := data.([]snapshots.Info)
-		if !ok || index < 0 {
-			return ""
-		}
-		result := BuildTree(snapshotTreeSpec, infos, folded)
-		if index >= len(result.Nodes) {
-			return ""
-		}
-		node := result.Nodes[index]
-		if node.HasChildren && nodeByID(infos, node.ID).Parent == "" {
-			return node.ID
-		}
+	}
+}
+
+func (snapshotKind) Rows(data any, folded map[string]bool) []table.Row {
+	infos, ok := data.([]snapshots.Info)
+	if !ok || len(infos) == 0 {
+		return nil
+	}
+	return BuildTree(snapshotTreeSpec, infos, folded).Rows
+}
+
+func (snapshotKind) FoldKey(data any, folded map[string]bool, index int) string {
+	infos, ok := data.([]snapshots.Info)
+	if !ok || index < 0 {
 		return ""
-	},
-	InitFolded: func(data any) map[string]bool {
-		infos, ok := data.([]snapshots.Info)
-		if !ok {
-			return nil
-		}
-		folded := make(map[string]bool)
-		DefaultFoldState(snapshotTreeSpec, infos, folded)
-		return folded
-	},
-	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
-		infos, ok := data.([]snapshots.Info)
-		if !ok || index < 0 {
-			return "", ""
-		}
-		result := BuildTree(snapshotTreeSpec, infos, folded)
-		if index >= len(result.Nodes) {
-			return "", ""
-		}
-		return formatSnapshotDetail(result.Nodes[index].Item)
-	},
+	}
+	result := BuildTree(snapshotTreeSpec, infos, folded)
+	if index >= len(result.Nodes) {
+		return ""
+	}
+	node := result.Nodes[index]
+	if node.HasChildren && nodeByID(infos, node.ID).Parent == "" {
+		return node.ID
+	}
+	return ""
+}
+
+func (snapshotKind) InitFolded(data any) map[string]bool {
+	infos, ok := data.([]snapshots.Info)
+	if !ok {
+		return nil
+	}
+	folded := make(map[string]bool)
+	DefaultFoldState(snapshotTreeSpec, infos, folded)
+	return folded
+}
+
+func (snapshotKind) Detail(data any, folded map[string]bool, index int) (string, string) {
+	infos, ok := data.([]snapshots.Info)
+	if !ok || index < 0 {
+		return "", ""
+	}
+	result := BuildTree(snapshotTreeSpec, infos, folded)
+	if index >= len(result.Nodes) {
+		return "", ""
+	}
+	return formatSnapshotDetail(result.Nodes[index].Item)
+}
+
+func (snapshotKind) CrossRefs(_ any, _ map[string]bool) []string {
+	return nil
 }
 
 func nodeByID(infos []snapshots.Info, id string) snapshots.Info {

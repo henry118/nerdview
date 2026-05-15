@@ -98,13 +98,49 @@ func TestShortDigest(t *testing.T) {
 	}
 }
 
+// mockKind implements Kind for testing with configurable callbacks.
+type mockKind struct {
+	RowsFunc      func(data any, folded map[string]bool) []table.Row
+	FoldKeyFunc   func(data any, folded map[string]bool, index int) string
+	InitFoldFunc  func(data any) map[string]bool
+	CrossRefsFunc func(data any, folded map[string]bool) []string
+}
+
+func (m mockKind) Name() string    { return "Test" }
+func (m mockKind) Columns() []Column { return []Column{{Title: "Name", MinWidth: 10, Flex: true}} }
+
+func (m mockKind) Rows(data any, folded map[string]bool) []table.Row {
+	return m.RowsFunc(data, folded)
+}
+
+func (m mockKind) FoldKey(data any, folded map[string]bool, index int) string {
+	if m.FoldKeyFunc == nil {
+		return ""
+	}
+	return m.FoldKeyFunc(data, folded, index)
+}
+
+func (m mockKind) InitFolded(data any) map[string]bool {
+	if m.InitFoldFunc == nil {
+		return nil
+	}
+	return m.InitFoldFunc(data)
+}
+
+func (m mockKind) Detail(_ any, _ map[string]bool, _ int) (string, string) {
+	return "", ""
+}
+
+func (m mockKind) CrossRefs(data any, folded map[string]bool) []string {
+	if m.CrossRefsFunc == nil {
+		return nil
+	}
+	return m.CrossRefsFunc(data, folded)
+}
+
 func TestTab_FoldUnfold(t *testing.T) {
-	kind := Kind{
-		Name: "Test",
-		Columns: []Column{
-			{Title: "Name", MinWidth: 10, Flex: true},
-		},
-		ToRows: func(data any, folded map[string]bool) []table.Row {
+	kind := mockKind{
+		RowsFunc: func(data any, folded map[string]bool) []table.Row {
 			items := data.([]string)
 			var rows []table.Row
 			for _, item := range items {
@@ -117,9 +153,8 @@ func TestTab_FoldUnfold(t *testing.T) {
 			}
 			return rows
 		},
-		RowID: func(data any, folded map[string]bool, index int) string {
+		FoldKeyFunc: func(data any, folded map[string]bool, index int) string {
 			items := data.([]string)
-			// Rebuild visible rows to find which item is at index
 			rowIdx := 0
 			for _, item := range items {
 				if rowIdx == index {
@@ -137,18 +172,15 @@ func TestTab_FoldUnfold(t *testing.T) {
 	tab := NewTab(kind, 80, 10)
 	tab.UpdateData([]string{"parent1", "parent2"})
 
-	// Initially unfolded — should have 4 rows (2 parents + 2 children)
 	if len(tab.Table.Rows()) != 4 {
 		t.Fatalf("Expected 4 rows unfolded, got %d", len(tab.Table.Rows()))
 	}
 
-	// Fold first item
 	tab.Fold()
 	if len(tab.Table.Rows()) != 3 {
 		t.Fatalf("Expected 3 rows after folding first, got %d", len(tab.Table.Rows()))
 	}
 
-	// Unfold it
 	tab.Unfold()
 	if len(tab.Table.Rows()) != 4 {
 		t.Fatalf("Expected 4 rows after unfolding, got %d", len(tab.Table.Rows()))
@@ -156,12 +188,8 @@ func TestTab_FoldUnfold(t *testing.T) {
 }
 
 func TestTab_FoldPreservedOnRefresh(t *testing.T) {
-	kind := Kind{
-		Name: "Test",
-		Columns: []Column{
-			{Title: "Name", MinWidth: 10, Flex: true},
-		},
-		ToRows: func(data any, folded map[string]bool) []table.Row {
+	kind := mockKind{
+		RowsFunc: func(data any, folded map[string]bool) []table.Row {
 			items := data.([]string)
 			var rows []table.Row
 			for _, item := range items {
@@ -174,7 +202,7 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 			}
 			return rows
 		},
-		RowID: func(data any, folded map[string]bool, index int) string {
+		FoldKeyFunc: func(data any, folded map[string]bool, index int) string {
 			items := data.([]string)
 			rowIdx := 0
 			for _, item := range items {
@@ -188,7 +216,7 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 			}
 			return ""
 		},
-		InitFolded: func(data any) map[string]bool {
+		InitFoldFunc: func(data any) map[string]bool {
 			items := data.([]string)
 			folded := make(map[string]bool)
 			for _, item := range items {
@@ -201,27 +229,207 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 	tab := NewTab(kind, 80, 10)
 	tab.UpdateData([]string{"parent1", "parent2"})
 
-	// InitFolded folds everything — should have 2 rows
 	if len(tab.Table.Rows()) != 2 {
 		t.Fatalf("Expected 2 rows (all folded), got %d", len(tab.Table.Rows()))
 	}
 
-	// User unfolds parent1
 	tab.Unfold()
 	if len(tab.Table.Rows()) != 3 {
 		t.Fatalf("Expected 3 rows after unfolding parent1, got %d", len(tab.Table.Rows()))
 	}
 
-	// Simulate data refresh with same data — parent1 should stay unfolded
 	tab.UpdateData([]string{"parent1", "parent2"})
 	if len(tab.Table.Rows()) != 3 {
 		t.Fatalf("Expected 3 rows after refresh (parent1 still unfolded), got %d", len(tab.Table.Rows()))
 	}
 
-	// Simulate refresh with new item added — new item should be folded, parent1 still unfolded
 	tab.UpdateData([]string{"parent1", "parent2", "parent3"})
-	// parent1 unfolded (2 rows) + parent2 folded (1 row) + parent3 folded (1 row) = 4
 	if len(tab.Table.Rows()) != 4 {
 		t.Fatalf("Expected 4 rows after adding parent3 (folded by default), got %d", len(tab.Table.Rows()))
+	}
+}
+
+func TestTab_FoldFromChild(t *testing.T) {
+	kind := mockKind{
+		RowsFunc: func(data any, folded map[string]bool) []table.Row {
+			items := data.([]string)
+			var rows []table.Row
+			for _, item := range items {
+				if folded[item] {
+					rows = append(rows, table.Row{"▸ " + item})
+				} else {
+					rows = append(rows, table.Row{"▾ " + item})
+					rows = append(rows, table.Row{"  child-of-" + item})
+				}
+			}
+			return rows
+		},
+		FoldKeyFunc: func(data any, folded map[string]bool, index int) string {
+			items := data.([]string)
+			rowIdx := 0
+			for _, item := range items {
+				if rowIdx == index {
+					return item
+				}
+				rowIdx++
+				if !folded[item] {
+					rowIdx++
+				}
+			}
+			return ""
+		},
+	}
+
+	tab := NewTab(kind, 80, 10)
+	tab.UpdateData([]string{"parent1", "parent2"})
+
+	// Move cursor to child of parent1 (row index 1)
+	tab.Table.SetCursor(1)
+
+	// Fold from child should fold parent1 and move cursor to parent1
+	folded := tab.Fold()
+	if !folded {
+		t.Fatal("Expected Fold() to return true from child")
+	}
+	if len(tab.Table.Rows()) != 3 {
+		t.Fatalf("Expected 3 rows after folding parent from child, got %d", len(tab.Table.Rows()))
+	}
+	if tab.Table.Cursor() != 0 {
+		t.Errorf("Expected cursor at 0 (parent1), got %d", tab.Table.Cursor())
+	}
+}
+
+func TestTab_RevealRow(t *testing.T) {
+	kind := mockKind{
+		RowsFunc: func(data any, folded map[string]bool) []table.Row {
+			items := data.([]string)
+			var rows []table.Row
+			for _, item := range items {
+				if folded[item] {
+					rows = append(rows, table.Row{"▸ " + item})
+				} else {
+					rows = append(rows, table.Row{"▾ " + item})
+					rows = append(rows, table.Row{"  child-of-" + item})
+				}
+			}
+			return rows
+		},
+		FoldKeyFunc: func(data any, folded map[string]bool, index int) string {
+			items := data.([]string)
+			rowIdx := 0
+			for _, item := range items {
+				if rowIdx == index {
+					return item
+				}
+				rowIdx++
+				if !folded[item] {
+					rowIdx++
+				}
+			}
+			return ""
+		},
+		InitFoldFunc: func(data any) map[string]bool {
+			items := data.([]string)
+			folded := make(map[string]bool)
+			for _, item := range items {
+				folded[item] = true
+			}
+			return folded
+		},
+	}
+
+	tab := NewTab(kind, 80, 10)
+	tab.UpdateData([]string{"parent1", "parent2"})
+
+	// Both folded — only 2 rows visible
+	if len(tab.Table.Rows()) != 2 {
+		t.Fatalf("Expected 2 rows (all folded), got %d", len(tab.Table.Rows()))
+	}
+
+	// RevealRow should unfold parent1 to show its child
+	idx := tab.RevealRow(func(row table.Row) bool {
+		return len(row) > 0 && row[0] == "  child-of-parent1"
+	})
+	if idx < 0 {
+		t.Fatal("RevealRow failed to find child-of-parent1")
+	}
+
+	// parent1 should be unfolded, parent2 should stay folded
+	if len(tab.Table.Rows()) != 3 {
+		t.Fatalf("Expected 3 rows (parent1 unfolded, parent2 folded), got %d", len(tab.Table.Rows()))
+	}
+
+	// Target not found at all
+	idx = tab.RevealRow(func(row table.Row) bool {
+		return len(row) > 0 && row[0] == "nonexistent"
+	})
+	if idx != -1 {
+		t.Errorf("Expected -1 for nonexistent row, got %d", idx)
+	}
+}
+
+func TestTab_SetWidth(t *testing.T) {
+	kind := mockKind{
+		RowsFunc: func(data any, _ map[string]bool) []table.Row {
+			return []table.Row{{"hello"}}
+		},
+	}
+	tab := NewTab(kind, 80, 10)
+	tab.UpdateData([]string{"x"})
+	tab.SetWidth(120)
+	if tab.Table.Width() != 120 {
+		t.Errorf("Table width = %d, want 120", tab.Table.Width())
+	}
+}
+
+func TestTab_SelectedDetail(t *testing.T) {
+	kind := mockKind{
+		RowsFunc: func(data any, _ map[string]bool) []table.Row {
+			return []table.Row{{"item1"}, {"item2"}}
+		},
+	}
+	tab := NewTab(kind, 80, 10)
+	tab.UpdateData([]string{"a", "b"})
+
+	title, body := tab.SelectedDetail()
+	if title != "" || body != "" {
+		t.Errorf("mockKind Detail returns empty, got title=%q body=%q", title, body)
+	}
+}
+
+func TestTab_CrossRef(t *testing.T) {
+	kind := mockKind{
+		RowsFunc: func(data any, _ map[string]bool) []table.Row {
+			items := data.([]string)
+			rows := make([]table.Row, len(items))
+			for i, item := range items {
+				rows[i] = table.Row{item}
+			}
+			return rows
+		},
+		CrossRefsFunc: func(data any, _ map[string]bool) []string {
+			items := data.([]string)
+			refs := make([]string, len(items))
+			for i, item := range items {
+				refs[i] = "ref-" + item
+			}
+			return refs
+		},
+	}
+
+	tab := NewTab(kind, 80, 10)
+	tab.UpdateData([]string{"a", "b", "c"})
+
+	if got := tab.CrossRef(0); got != "ref-a" {
+		t.Errorf("CrossRef(0) = %q, want %q", got, "ref-a")
+	}
+	if got := tab.CrossRef(2); got != "ref-c" {
+		t.Errorf("CrossRef(2) = %q, want %q", got, "ref-c")
+	}
+	if got := tab.CrossRef(99); got != "" {
+		t.Errorf("CrossRef(99) = %q, want empty", got)
+	}
+	if got := tab.CrossRef(-1); got != "" {
+		t.Errorf("CrossRef(-1) = %q, want empty", got)
 	}
 }

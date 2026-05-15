@@ -15,6 +15,7 @@
 package resource
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/henry118/nerdview/ctr"
@@ -79,7 +80,7 @@ func testImageTrees() []ctr.ImageTree {
 
 func TestImageKindToRows_Unfolded(t *testing.T) {
 	data := testImageTrees()
-	rows := ImageKind.ToRows(data, nil)
+	rows := ImageKind.Rows(data, nil)
 
 	// nginx (1) + linux/amd64 (1) + config (1) + layer (1) + linux/arm64 (1) + alpine (1) = 6
 	if len(rows) != 6 {
@@ -107,7 +108,7 @@ func TestImageKindToRows_Folded(t *testing.T) {
 	nginxDigest := data[0].Desc.Digest.String()
 	folded := map[string]bool{nginxDigest: true}
 
-	rows := ImageKind.ToRows(data, folded)
+	rows := ImageKind.Rows(data, folded)
 
 	// nginx folded (1) + alpine (1) = 2
 	if len(rows) != 2 {
@@ -139,13 +140,13 @@ func TestImageKindRowID(t *testing.T) {
 	folded := map[string]bool{}
 
 	// Index 0 is nginx (has children) — should return its digest
-	id := ImageKind.RowID(data, folded, 0)
+	id := ImageKind.FoldKey(data, folded, 0)
 	if id == "" {
 		t.Error("RowID for nginx (index 0) should be non-empty")
 	}
 
 	// Find alpine's index (last row = 5 when unfolded)
-	id = ImageKind.RowID(data, folded, 5)
+	id = ImageKind.FoldKey(data, folded, 5)
 	if id != "" {
 		t.Errorf("RowID for alpine (no children) should be empty, got %q", id)
 	}
@@ -156,14 +157,30 @@ func TestShortMediaType(t *testing.T) {
 		input string
 		want  string
 	}{
+		// Index types
 		{"application/vnd.oci.image.index.v1+json", "index"},
+		{"application/vnd.docker.distribution.manifest.list.v2+json", "index"},
+		// Manifest types
 		{"application/vnd.oci.image.manifest.v1+json", "manifest"},
+		{"application/vnd.docker.distribution.manifest.v2+json", "manifest"},
+		// Config types
 		{"application/vnd.oci.image.config.v1+json", "config"},
+		{"application/vnd.docker.container.image.v1+json", "config"},
+		// OCI layer types (suffix after +)
 		{"application/vnd.oci.image.layer.v1.tar+gzip", "layer/gzip"},
 		{"application/vnd.oci.image.layer.v1.tar+zstd", "layer/zstd"},
-		{"application/vnd.docker.distribution.manifest.v2+json", "manifest"},
+		{"application/vnd.oci.image.layer.v1.tar+erofs", "layer/erofs"},
+		{"application/vnd.oci.image.layer.v1.tar", "layer"},
+		// Nondistributable OCI layers
+		{"application/vnd.oci.image.layer.nondistributable.v1.tar+gzip", "layer/gzip"},
+		{"application/vnd.oci.image.layer.nondistributable.v1.tar", "layer"},
+		// Docker layer types (compression after .tar.)
 		{"application/vnd.docker.image.rootfs.diff.tar.gzip", "layer/gzip"},
+		{"application/vnd.docker.image.rootfs.diff.tar.zstd", "layer/zstd"},
+		{"application/vnd.docker.image.rootfs.foreign.diff.tar.gzip", "layer/gzip"},
+		// Unknown fallback
 		{"something.unknown", "unknown"},
+		{"no-dot", "no-dot"},
 	}
 	for _, tt := range tests {
 		got := shortMediaType(tt.input)
@@ -283,7 +300,7 @@ func TestImageKindToRows_SizeShowsTotal(t *testing.T) {
 		},
 	}
 
-	rows := ImageKind.ToRows(data, nil)
+	rows := ImageKind.Rows(data, nil)
 
 	// Root row should show total size (500 + 1000 + 10M)
 	rootSize := rows[0][4]
@@ -328,7 +345,7 @@ func TestImagesSortedByDigest(t *testing.T) {
 		},
 	}
 
-	rows := ImageKind.ToRows(data, nil)
+	rows := ImageKind.Rows(data, nil)
 	if len(rows) != 2 {
 		t.Fatalf("Expected 2 rows, got %d", len(rows))
 	}
@@ -370,7 +387,7 @@ func TestImagesDuplicateDigestAdjacent(t *testing.T) {
 		},
 	}
 
-	rows := ImageKind.ToRows(data, nil)
+	rows := ImageKind.Rows(data, nil)
 
 	// Find positions of the two shared-digest rows
 	var sharedPositions []int
@@ -387,5 +404,116 @@ func TestImagesDuplicateDigestAdjacent(t *testing.T) {
 
 	if sharedPositions[1]-sharedPositions[0] != 1 {
 		t.Errorf("Shared digest rows at positions %v are not adjacent", sharedPositions)
+	}
+}
+
+func TestImageKindDetail(t *testing.T) {
+	data := testImageTrees()
+
+	title, body := ImageKind.Detail(data, nil, 0)
+	if title != "docker.io/library/nginx:latest" {
+		t.Errorf("Title = %q, want %q", title, "docker.io/library/nginx:latest")
+	}
+	if !strings.Contains(body, "MediaType:") {
+		t.Error("Should contain MediaType")
+	}
+	if !strings.Contains(body, "Digest:") {
+		t.Error("Should contain Digest")
+	}
+}
+
+func TestImageKindCrossRefs(t *testing.T) {
+	snKey := "sha256:abc123"
+	data := []ctr.ImageTree{
+		{
+			Name:        "myimage:latest",
+			Desc:        ocispec.Descriptor{MediaType: "application/vnd.oci.image.manifest.v1+json", Digest: digest.FromString("img"), Size: 100},
+			SnapshotKey: snKey,
+			Children: []ctr.ImageTree{
+				{Desc: ocispec.Descriptor{MediaType: "application/vnd.oci.image.config.v1+json", Digest: digest.FromString("cfg"), Size: 50}},
+			},
+		},
+	}
+	refs := ImageKind.CrossRefs(data, nil)
+
+	// Root has children + snapshot key -> non-empty ref; child has no children -> empty
+	if len(refs) != 2 {
+		t.Fatalf("Expected 2 refs, got %d", len(refs))
+	}
+	if refs[0] != snKey {
+		t.Errorf("CrossRef[0] = %q, want %q", refs[0], snKey)
+	}
+	if refs[1] != "" {
+		t.Errorf("CrossRef[1] = %q, want empty (leaf node)", refs[1])
+	}
+}
+
+func TestImageKindNameAndColumns(t *testing.T) {
+	if ImageKind.Name() != "Images" {
+		t.Errorf("Name = %q, want %q", ImageKind.Name(), "Images")
+	}
+	cols := ImageKind.Columns()
+	if len(cols) != 5 {
+		t.Errorf("Expected 5 columns, got %d", len(cols))
+	}
+}
+
+func TestImageKindDetail_WithAnnotations(t *testing.T) {
+	data := []ctr.ImageTree{
+		{
+			Name: "annotated:v1",
+			Desc: ocispec.Descriptor{
+				MediaType:   "application/vnd.oci.image.manifest.v1+json",
+				Digest:      digest.FromString("ann"),
+				Size:        100,
+				Platform:    &ocispec.Platform{OS: "linux", Architecture: "amd64", Variant: "v8"},
+				Annotations: map[string]string{"org.opencontainers.image.source": "https://github.com/example"},
+			},
+			Labels: map[string]string{"containerd.io/gc.ref": "val"},
+		},
+	}
+
+	_, body := ImageKind.Detail(data, nil, 0)
+	if !strings.Contains(body, "Platform:   linux/amd64/v8") {
+		t.Error("Should show platform with variant")
+	}
+	if !strings.Contains(body, "Annotations:") {
+		t.Error("Should show annotations section")
+	}
+	if !strings.Contains(body, "org.opencontainers.image.source") {
+		t.Error("Should show annotation key")
+	}
+	if !strings.Contains(body, "Labels:") {
+		t.Error("Should show labels section")
+	}
+}
+
+func TestImageKind_NilData(t *testing.T) {
+	if rows := ImageKind.Rows(nil, nil); rows != nil {
+		t.Error("Rows(nil) should be nil")
+	}
+	if id := ImageKind.FoldKey(nil, nil, 0); id != "" {
+		t.Error("FoldKey(nil) should be empty")
+	}
+	if folded := ImageKind.InitFolded(nil); folded != nil {
+		t.Error("InitFolded(nil) should be nil")
+	}
+	if _, body := ImageKind.Detail(nil, nil, 0); body != "" {
+		t.Error("Detail(nil) should be empty")
+	}
+	if refs := ImageKind.CrossRefs(nil, nil); refs != nil {
+		t.Error("CrossRefs(nil) should be nil")
+	}
+}
+
+func TestImageKindDetail_LeafNode(t *testing.T) {
+	data := testImageTrees()
+	// Index 5 is alpine (no children, leaf node)
+	title, body := ImageKind.Detail(data, nil, 5)
+	if title != "docker.io/library/alpine:3.19" {
+		t.Errorf("Title = %q, want %q", title, "docker.io/library/alpine:3.19")
+	}
+	if !strings.Contains(body, "Name:") {
+		t.Error("Should contain Name")
 	}
 }

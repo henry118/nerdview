@@ -18,24 +18,15 @@ package resource
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/henry118/nerdview/logging"
 	"github.com/henry118/nerdview/ui"
 )
 
-// Tree icons and connectors for hierarchical display.
-const (
-	IconFolded   = "▸ "
-	IconUnfolded = "▾ "
-	ConnMid      = "├─ "
-	ConnLast     = "└─ "
-	ConnPipe     = "│  "
-	ConnBlank    = "   "
-)
-
-// FormatBytes formats a byte count into a human-readable string.
+// FormatBytes formats a byte count into a human-readable string (B/K/M/G).
 func FormatBytes(b uint64) string {
 	switch {
 	case b >= 1<<30:
@@ -49,8 +40,7 @@ func FormatBytes(b uint64) string {
 	}
 }
 
-// ShortDigest truncates a "prefix:hex" string to show only the first 12 hex chars.
-// For example, "sha256:7a75083e5b5a8d59..." becomes "sha256:7a75083e5b5a".
+// ShortDigest truncates "algo:hex" to show only the first 12 hex chars.
 // Strings without a colon are returned unchanged.
 func ShortDigest(s string) string {
 	if idx := strings.Index(s, ":"); idx >= 0 {
@@ -66,43 +56,40 @@ func ShortDigest(s string) string {
 type Column struct {
 	Title    string
 	MinWidth int
-	Flex     bool // Flex columns shrink when total width exceeds terminal width.
+	Flex     bool // Flex columns shrink proportionally when total exceeds terminal width.
 }
 
-// Kind describes a resource type and how to render it. Each resource (images,
-// containers, etc.) defines a Kind with column definitions and callbacks for
-// converting raw data into table rows and detail views.
-type Kind struct {
-	Name    string
-	Columns []Column
-	// ToRows converts raw data into table rows, respecting the current fold state.
-	ToRows func(data any, folded map[string]bool) []table.Row
-	// RowID returns a unique fold key for the row at the given index.
-	// Return empty string for non-foldable rows. If nil, folding is disabled.
-	RowID func(data any, folded map[string]bool, index int) string
+// Kind defines how a resource type (images, containers, etc.) is displayed
+// and interacted with in the TUI. Each resource implements this interface.
+type Kind interface {
+	Name() string
+	Columns() []Column
+	// Rows converts raw data into table rows, respecting the current fold state.
+	Rows(data any, folded map[string]bool) []table.Row
+	// FoldKey returns the fold key for the row at index, or "" if not foldable.
+	FoldKey(data any, folded map[string]bool, index int) string
 	// InitFolded returns the default fold state for newly loaded data.
-	// Keys map to true (folded) or false (unfolded). If nil, nothing is folded.
-	InitFolded func(data any) map[string]bool
-	// ToDetail returns a title and formatted body for the detail dialog.
-	ToDetail func(data any, folded map[string]bool, index int) (title string, body string)
-	// GoToRefs returns navigation references for all visible rows.
-	// Used for cross-tab "go to" navigation. If nil, go-to is disabled.
-	GoToRefs func(data any, folded map[string]bool) []string
+	InitFolded(data any) map[string]bool
+	// Detail returns a title and formatted body for the detail popup.
+	Detail(data any, folded map[string]bool, index int) (string, string)
+	// CrossRefs returns navigation references for all visible rows.
+	CrossRefs(data any, folded map[string]bool) []string
 }
 
 // Tab wraps a table model with its Kind, raw data, and fold state.
+// It manages the lifecycle of rendering rows, column sizing, and fold operations.
 type Tab struct {
-	Kind      Kind
-	Table     table.Model
-	RawData   any
-	Folded    map[string]bool
-	goToRefs  []string
-	width     int
+	Kind      Kind            // Resource type defining how data is rendered.
+	Table     table.Model     // Underlying bubbletea table component.
+	RawData   any             // Raw data slice (type-asserted by Kind methods).
+	Folded    map[string]bool // Fold state keyed by fold key; true means collapsed.
+	crossRefs []string        // Cached cross-references for navigation.
+	width     int             // Current terminal width for column sizing.
 }
 
 // NewTab creates a Tab for the given Kind with initial dimensions.
 func NewTab(kind Kind, width, height int) Tab {
-	cols := fitColumns(kind.Columns, nil, width)
+	cols := fitColumns(kind.Columns(), nil, width)
 	t := table.New(
 		table.WithColumns(cols),
 		table.WithRows(nil),
@@ -111,10 +98,7 @@ func NewTab(kind Kind, width, height int) Tab {
 		table.WithWidth(width),
 	)
 	s := table.DefaultStyles()
-	s.Selected = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color(ui.ColorBase)).
-		Background(lipgloss.Color(ui.ColorTeal))
+	s.Selected = ui.StyleTableSelected
 	t.SetStyles(s)
 
 	return Tab{
@@ -132,45 +116,37 @@ func (t *Tab) SetWidth(width int) {
 	t.recalcColumns()
 }
 
-// UpdateData replaces the tab's data and refreshes rows. New foldable nodes
-// are folded by default; user-toggled fold state is preserved across refreshes.
+// UpdateData replaces the tab's data and refreshes rows. User-toggled fold
+// state is preserved across refreshes; new foldable nodes use InitFolded defaults.
 func (t *Tab) UpdateData(data any) {
 	t.RawData = data
-	if t.Kind.InitFolded != nil {
-		// Merge: fold new nodes that aren't already tracked
-		defaults := t.Kind.InitFolded(data)
-		for k, v := range defaults {
-			if _, exists := t.Folded[k]; !exists {
-				t.Folded[k] = v
-			}
+	defaults := t.Kind.InitFolded(data)
+	for k, v := range defaults {
+		if _, exists := t.Folded[k]; !exists {
+			t.Folded[k] = v
 		}
 	}
 	t.refreshRows()
 }
 
 func (t *Tab) refreshRows() {
-	rows := t.Kind.ToRows(t.RawData, t.Folded)
+	rows := t.Kind.Rows(t.RawData, t.Folded)
 	t.Table.SetRows(rows)
 	t.recalcColumns()
-	t.buildGoToRefs()
+	t.buildCrossRefs()
 }
 
-func (t *Tab) buildGoToRefs() {
-	if t.Kind.GoToRefs == nil {
-		t.goToRefs = nil
-		return
-	}
-	t.goToRefs = t.Kind.GoToRefs(t.RawData, t.Folded)
+func (t *Tab) buildCrossRefs() {
+	t.crossRefs = t.Kind.CrossRefs(t.RawData, t.Folded)
 }
 
-// Unfold expands the current row if it's a foldable node that is folded.
-// Returns true if an unfold happened.
+// Unfold expands the current row if it is a folded node. Returns true if it unfolded.
 func (t *Tab) Unfold() bool {
-	if t.Kind.RowID == nil || t.RawData == nil {
+	if t.RawData == nil {
 		return false
 	}
 	idx := t.Table.Cursor()
-	id := t.Kind.RowID(t.RawData, t.Folded, idx)
+	id := t.Kind.FoldKey(t.RawData, t.Folded, idx)
 	if id == "" || !t.Folded[id] {
 		return false
 	}
@@ -179,27 +155,23 @@ func (t *Tab) Unfold() bool {
 	return true
 }
 
-// Fold collapses the nearest foldable ancestor of the current row.
-// If on a foldable root that is already unfolded, folds it.
-// If on a child, finds and folds the parent root.
-// Returns true if a fold happened.
+// Fold collapses the current node or its nearest foldable ancestor.
+// Moves the cursor to the folded parent. Returns true if it folded.
 func (t *Tab) Fold() bool {
-	if t.Kind.RowID == nil || t.RawData == nil {
+	if t.RawData == nil {
 		return false
 	}
 	idx := t.Table.Cursor()
 
-	// If current row is foldable and unfolded, fold it
-	id := t.Kind.RowID(t.RawData, t.Folded, idx)
+	id := t.Kind.FoldKey(t.RawData, t.Folded, idx)
 	if id != "" && !t.Folded[id] {
 		t.Folded[id] = true
 		t.refreshRows()
 		return true
 	}
 
-	// Otherwise, scan backwards to find nearest foldable ancestor
 	for i := idx - 1; i >= 0; i-- {
-		parentID := t.Kind.RowID(t.RawData, t.Folded, i)
+		parentID := t.Kind.FoldKey(t.RawData, t.Folded, i)
 		if parentID != "" && !t.Folded[parentID] {
 			t.Folded[parentID] = true
 			t.refreshRows()
@@ -213,7 +185,6 @@ func (t *Tab) Fold() bool {
 // RevealRow unfolds only the ancestor that hides a row matching the predicate.
 // Returns the row index if found, or -1.
 func (t *Tab) RevealRow(match func(row table.Row) bool) int {
-	// Check if already visible
 	rows := t.Table.Rows()
 	for i, row := range rows {
 		if match(row) {
@@ -221,15 +192,8 @@ func (t *Tab) RevealRow(match func(row table.Row) bool) int {
 		}
 	}
 
-	if t.Kind.RowID == nil {
-		return -1
-	}
-
-	// Find target by temporarily unfolding everything
 	savedFolded := make(map[string]bool, len(t.Folded))
-	for k, v := range t.Folded {
-		savedFolded[k] = v
-	}
+	maps.Copy(savedFolded, t.Folded)
 
 	for id := range t.Folded {
 		t.Folded[id] = false
@@ -251,19 +215,18 @@ func (t *Tab) RevealRow(match func(row table.Row) bool) int {
 		return -1
 	}
 
-	// Walk backwards from target to find its direct foldable ancestor
 	ancestorID := ""
 	for i := targetIdx - 1; i >= 0; i-- {
-		id := t.Kind.RowID(t.RawData, t.Folded, i)
+		id := t.Kind.FoldKey(t.RawData, t.Folded, i)
 		if id != "" {
 			ancestorID = id
 			break
 		}
 	}
 
-	// Restore original fold state, then unfold only the ancestor
 	t.Folded = savedFolded
 	if ancestorID != "" {
+		logging.Debug("RevealRow: unfolding ancestor %s", ancestorID)
 		t.Folded[ancestorID] = false
 	}
 	t.refreshRows()
@@ -277,50 +240,38 @@ func (t *Tab) RevealRow(match func(row table.Row) bool) int {
 	return -1
 }
 
-// CanFold reports whether this tab supports folding.
-func (t *Tab) CanFold() bool {
-	return t.Kind.RowID != nil
-}
-
 func (t *Tab) recalcColumns() {
 	rows := t.Table.Rows()
-	cols := fitColumns(t.Kind.Columns, rows, t.width)
+	cols := fitColumns(t.Kind.Columns(), rows, t.width)
 	t.Table.SetColumns(cols)
 }
 
-// GoToRef returns the cached navigation reference for the row at the given index.
-func (t *Tab) GoToRef(index int) string {
-	if index >= 0 && index < len(t.goToRefs) {
-		return t.goToRefs[index]
+// CrossRef returns the cached cross-reference for the row at index.
+func (t *Tab) CrossRef(index int) string {
+	if index >= 0 && index < len(t.crossRefs) {
+		return t.crossRefs[index]
 	}
 	return ""
 }
 
-// SelectedDetail returns the title and body for the currently selected row's detail view.
+// SelectedDetail returns the title and body for the currently selected row's detail popup.
 func (t *Tab) SelectedDetail() (string, string) {
 	if t.RawData == nil {
 		return "", ""
 	}
 	idx := t.Table.Cursor()
-	return t.Kind.ToDetail(t.RawData, t.Folded, idx)
+	return t.Kind.Detail(t.RawData, t.Folded, idx)
 }
 
 func fitColumns(defs []Column, rows []table.Row, totalWidth int) []table.Column {
 	cols := make([]table.Column, len(defs))
 
-	// Each cell has 1 char padding on each side (from table.DefaultStyles)
 	cellPadding := 2 * len(defs)
-	availableWidth := totalWidth - cellPadding
-	if availableWidth < len(defs) {
-		availableWidth = len(defs)
-	}
+	availableWidth := max(totalWidth-cellPadding, len(defs))
 
 	widths := make([]int, len(defs))
 	for i, d := range defs {
-		widths[i] = len(d.Title)
-		if widths[i] < d.MinWidth {
-			widths[i] = d.MinWidth
-		}
+		widths[i] = max(len(d.Title), d.MinWidth)
 	}
 
 	for _, row := range rows {
@@ -357,10 +308,7 @@ func fitColumns(defs []Column, rows []table.Row, totalWidth int) []table.Column 
 			shrunk := 0
 			for i, d := range defs {
 				if d.Flex && widths[i] > d.MinWidth {
-					shrink := perCol
-					if shrink > widths[i]-d.MinWidth {
-						shrink = widths[i] - d.MinWidth
-					}
+					shrink := min(perCol, widths[i]-d.MinWidth)
 					widths[i] -= shrink
 					shrunk += shrink
 				}

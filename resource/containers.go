@@ -52,64 +52,31 @@ var containerTreeSpec = TreeSpec[ctr.ContainerInfo]{
 	},
 }
 
-var ContainerKind = Kind{
-	Name: "Containers",
-	Columns: []Column{
+type containerKind struct{}
+
+var ContainerKind Kind = containerKind{}
+
+func (containerKind) Name() string { return "Containers" }
+
+func (containerKind) Columns() []Column {
+	return []Column{
 		{Title: "ID", MinWidth: 12, Flex: true},
 		{Title: "Type", MinWidth: 8},
 		{Title: "Image", MinWidth: 20, Flex: true},
 		{Title: "Runtime", MinWidth: 16},
 		{Title: "Created", MinWidth: 20},
-	},
-	ToRows: func(data any, folded map[string]bool) []table.Row {
-		infos, ok := data.([]ctr.ContainerInfo)
-		if !ok || len(infos) == 0 {
-			return nil
-		}
-		return BuildTree(containerTreeSpec, infos, folded).Rows
-	},
-	RowID: func(data any, folded map[string]bool, index int) string {
-		infos, ok := data.([]ctr.ContainerInfo)
-		if !ok || index < 0 {
-			return ""
-		}
-		result := BuildTree(containerTreeSpec, infos, folded)
-		if index >= len(result.Nodes) {
-			return ""
-		}
-		node := result.Nodes[index]
-		if node.HasChildren && node.Item.IsSandbox {
-			return node.ID
-		}
-		return ""
-	},
-	ToDetail: func(data any, folded map[string]bool, index int) (string, string) {
-		infos, ok := data.([]ctr.ContainerInfo)
-		if !ok || index < 0 {
-			return "", ""
-		}
-		result := BuildTree(containerTreeSpec, infos, folded)
-		if index >= len(result.Nodes) {
-			return "", ""
-		}
-		return formatContainerDetail(result.Nodes[index].Item)
-	},
-	GoToRefs: func(data any, folded map[string]bool) []string {
-		infos, ok := data.([]ctr.ContainerInfo)
-		if !ok {
-			return nil
-		}
-		result := BuildTree(containerTreeSpec, infos, folded)
-		refs := make([]string, len(result.Nodes))
-		for i, node := range result.Nodes {
-			refs[i] = node.Item.Container.SnapshotKey
-		}
-		return refs
-	},
+	}
 }
 
-// ContainerSnapshotRef returns the SnapshotKey for the container row at the given index.
-func ContainerSnapshotRef(data any, folded map[string]bool, index int) string {
+func (containerKind) Rows(data any, folded map[string]bool) []table.Row {
+	infos, ok := data.([]ctr.ContainerInfo)
+	if !ok || len(infos) == 0 {
+		return nil
+	}
+	return BuildTree(containerTreeSpec, infos, folded).Rows
+}
+
+func (containerKind) FoldKey(data any, folded map[string]bool, index int) string {
 	infos, ok := data.([]ctr.ContainerInfo)
 	if !ok || index < 0 {
 		return ""
@@ -118,10 +85,42 @@ func ContainerSnapshotRef(data any, folded map[string]bool, index int) string {
 	if index >= len(result.Nodes) {
 		return ""
 	}
-	return result.Nodes[index].Item.Container.SnapshotKey
+	node := result.Nodes[index]
+	if node.HasChildren && node.Item.IsSandbox {
+		return node.ID
+	}
+	return ""
 }
 
-// ContainerSpec returns the formatted runtime spec for the container at the given row index.
+func (containerKind) InitFolded(_ any) map[string]bool {
+	return nil
+}
+
+func (containerKind) Detail(data any, folded map[string]bool, index int) (string, string) {
+	infos, ok := data.([]ctr.ContainerInfo)
+	if !ok || index < 0 {
+		return "", ""
+	}
+	result := BuildTree(containerTreeSpec, infos, folded)
+	if index >= len(result.Nodes) {
+		return "", ""
+	}
+	return formatContainerDetail(result.Nodes[index].Item)
+}
+
+func (containerKind) CrossRefs(data any, folded map[string]bool) []string {
+	infos, ok := data.([]ctr.ContainerInfo)
+	if !ok {
+		return nil
+	}
+	result := BuildTree(containerTreeSpec, infos, folded)
+	refs := make([]string, len(result.Nodes))
+	for i, node := range result.Nodes {
+		refs[i] = node.Item.Container.SnapshotKey
+	}
+	return refs
+}
+
 func ContainerSpec(data any, folded map[string]bool, index int) (string, string) {
 	infos, ok := data.([]ctr.ContainerInfo)
 	if !ok || index < 0 {
