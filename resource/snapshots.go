@@ -46,9 +46,9 @@ func (snapshotKind) Name() string { return "Snapshots" }
 
 func (snapshotKind) Columns() []Column {
 	return []Column{
-		{Title: "Name", MinWidth: 20, Flex: true},
-		{Title: "Kind", MinWidth: 10},
-		{Title: "Created", MinWidth: 20},
+		{Title: "NAME", MinWidth: 20, Flex: true},
+		{Title: "KIND", MinWidth: 10},
+		{Title: "CREATED", MinWidth: 20},
 	}
 }
 
