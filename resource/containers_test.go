@@ -93,7 +93,7 @@ func TestContainerTreeNodes(t *testing.T) {
 	}
 }
 
-func TestContainerKindToRows_Unfolded(t *testing.T) {
+func TestContainerKindRows_Unfolded(t *testing.T) {
 	data := testContainers()
 	rows := ContainerKind.Rows(data, nil)
 
@@ -127,7 +127,7 @@ func TestContainerKindToRows_Unfolded(t *testing.T) {
 	}
 }
 
-func TestContainerKindToRows_Folded(t *testing.T) {
+func TestContainerKindRows_Folded(t *testing.T) {
 	data := testContainers()
 	folded := map[string]bool{"sandbox-abc": true}
 	rows := ContainerKind.Rows(data, folded)
@@ -141,7 +141,7 @@ func TestContainerKindToRows_Folded(t *testing.T) {
 	}
 }
 
-func TestContainerKindRowID(t *testing.T) {
+func TestContainerKindFoldKey(t *testing.T) {
 	data := testContainers()
 	folded := map[string]bool{}
 	ContainerKind.Rows(data, folded)

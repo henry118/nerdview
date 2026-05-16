@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-func TestEventKindToRows(t *testing.T) {
+func TestEventKindRows(t *testing.T) {
 	now := time.Date(2025, 1, 15, 10, 30, 45, 123000000, time.UTC)
 	data := []Event{
 		{Timestamp: now, Namespace: "default", Topic: "/images/create"},
@@ -43,7 +43,7 @@ func TestEventKindToRows(t *testing.T) {
 	}
 }
 
-func TestEventKindToDetail(t *testing.T) {
+func TestEventKindDetail(t *testing.T) {
 	now := time.Date(2025, 1, 15, 10, 30, 45, 0, time.UTC)
 	data := []Event{
 		{Timestamp: now, Namespace: "default", Topic: "/tasks/exit"},
@@ -62,7 +62,7 @@ func TestEventKindToDetail(t *testing.T) {
 	}
 }
 
-func TestEventKindToDetail_WithPayload(t *testing.T) {
+func TestEventKindDetail_WithPayload(t *testing.T) {
 	now := time.Date(2025, 1, 15, 10, 30, 45, 0, time.UTC)
 
 	type fakePayload struct {
@@ -92,7 +92,7 @@ func TestEventKindToDetail_WithPayload(t *testing.T) {
 	}
 }
 
-func TestEventKindToDetail_NilPayload(t *testing.T) {
+func TestEventKindDetail_NilPayload(t *testing.T) {
 	now := time.Date(2025, 1, 15, 10, 30, 45, 0, time.UTC)
 	data := []Event{
 		{Timestamp: now, Namespace: "default", Topic: "/images/create", Payload: nil},

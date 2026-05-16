@@ -78,7 +78,7 @@ func testImageTrees() []ctr.ImageTree {
 	}
 }
 
-func TestImageKindToRows_Unfolded(t *testing.T) {
+func TestImageKindRows_Unfolded(t *testing.T) {
 	data := testImageTrees()
 	rows := ImageKind.Rows(data, nil)
 
@@ -103,7 +103,7 @@ func TestImageKindToRows_Unfolded(t *testing.T) {
 	}
 }
 
-func TestImageKindToRows_Folded(t *testing.T) {
+func TestImageKindRows_Folded(t *testing.T) {
 	data := testImageTrees()
 	nginxDigest := data[0].Desc.Digest.String()
 	folded := map[string]bool{nginxDigest: true}
@@ -135,7 +135,7 @@ func TestImageKindInitFolded(t *testing.T) {
 	}
 }
 
-func TestImageKindRowID(t *testing.T) {
+func TestImageKindFoldKey(t *testing.T) {
 	data := testImageTrees()
 	folded := map[string]bool{}
 
@@ -272,7 +272,7 @@ func TestTotalSize_LeafNode(t *testing.T) {
 	}
 }
 
-func TestImageKindToRows_SizeShowsTotal(t *testing.T) {
+func TestImageKindRows_SizeShowsTotal(t *testing.T) {
 	data := []ctr.ImageTree{
 		{
 			Name: "myimage:latest",
