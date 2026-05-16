@@ -38,13 +38,16 @@ var snapshotTreeSpec = TreeSpec[snapshots.Info]{
 	},
 }
 
-type snapshotKind struct{}
+type snapshotKind struct {
+	cache BuildResult[snapshots.Info]
+	infos []snapshots.Info
+}
 
-var SnapshotKind Kind = snapshotKind{}
+var SnapshotKind Kind = &snapshotKind{}
 
-func (snapshotKind) Name() string { return "Snapshots" }
+func (k *snapshotKind) Name() string { return "Snapshots" }
 
-func (snapshotKind) Columns() []Column {
+func (k *snapshotKind) Columns() []Column {
 	return []Column{
 		{Title: "NAME", MinWidth: 20, Flex: true},
 		{Title: "KIND", MinWidth: 10},
@@ -52,31 +55,31 @@ func (snapshotKind) Columns() []Column {
 	}
 }
 
-func (snapshotKind) Rows(data any, folded map[string]bool) []table.Row {
+// Rows rebuilds the tree cache. Must be called before FoldKey/Detail/CrossRefs.
+func (k *snapshotKind) Rows(data any, folded map[string]bool) []table.Row {
 	infos, ok := data.([]snapshots.Info)
 	if !ok || len(infos) == 0 {
+		k.cache = BuildResult[snapshots.Info]{} // Clear stale cache on empty data.
+		k.infos = nil
 		return nil
 	}
-	return BuildTree(snapshotTreeSpec, infos, folded).Rows
+	k.infos = infos
+	k.cache = BuildTree(snapshotTreeSpec, infos, folded)
+	return k.cache.Rows
 }
 
-func (snapshotKind) FoldKey(data any, folded map[string]bool, index int) string {
-	infos, ok := data.([]snapshots.Info)
-	if !ok || index < 0 {
+func (k *snapshotKind) FoldKey(_ any, _ map[string]bool, index int) string {
+	if index < 0 || index >= len(k.cache.Nodes) {
 		return ""
 	}
-	result := BuildTree(snapshotTreeSpec, infos, folded)
-	if index >= len(result.Nodes) {
-		return ""
-	}
-	node := result.Nodes[index]
-	if node.HasChildren && nodeByID(infos, node.ID).Parent == "" {
+	node := k.cache.Nodes[index]
+	if node.HasChildren && nodeByID(k.infos, node.ID).Parent == "" {
 		return node.ID
 	}
 	return ""
 }
 
-func (snapshotKind) InitFolded(data any) map[string]bool {
+func (k *snapshotKind) InitFolded(data any) map[string]bool {
 	infos, ok := data.([]snapshots.Info)
 	if !ok {
 		return nil
@@ -86,19 +89,14 @@ func (snapshotKind) InitFolded(data any) map[string]bool {
 	return folded
 }
 
-func (snapshotKind) Detail(data any, folded map[string]bool, index int) (string, string) {
-	infos, ok := data.([]snapshots.Info)
-	if !ok || index < 0 {
+func (k *snapshotKind) Detail(_ any, _ map[string]bool, index int) (string, string) {
+	if index < 0 || index >= len(k.cache.Nodes) {
 		return "", ""
 	}
-	result := BuildTree(snapshotTreeSpec, infos, folded)
-	if index >= len(result.Nodes) {
-		return "", ""
-	}
-	return formatSnapshotDetail(result.Nodes[index].Item)
+	return formatSnapshotDetail(k.cache.Nodes[index].Item)
 }
 
-func (snapshotKind) CrossRefs(_ any, _ map[string]bool) []string {
+func (k *snapshotKind) CrossRefs(_ any, _ map[string]bool) []string {
 	return nil
 }
 

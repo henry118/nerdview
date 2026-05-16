@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestTaskKindToRows(t *testing.T) {
+func TestTaskKindRows(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
 			ContainerID: "container-1",
@@ -81,7 +81,7 @@ func TestTaskKindToRows(t *testing.T) {
 	}
 }
 
-func TestTaskKindToDetail_Running(t *testing.T) {
+func TestTaskKindDetail_Running(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
 			ContainerID: "my-container",
@@ -115,7 +115,7 @@ func TestTaskKindToDetail_Running(t *testing.T) {
 	}
 }
 
-func TestTaskKindToDetail_Exec(t *testing.T) {
+func TestTaskKindDetail_Exec(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
 			ContainerID: "my-container",
@@ -141,7 +141,7 @@ func TestTaskKindToDetail_Exec(t *testing.T) {
 	}
 }
 
-func TestTaskKindToDetail_Stopped(t *testing.T) {
+func TestTaskKindDetail_Stopped(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
 			ContainerID: "exited-ctr",

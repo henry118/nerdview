@@ -93,7 +93,7 @@ func TestContainerTreeNodes(t *testing.T) {
 	}
 }
 
-func TestContainerKindToRows_Unfolded(t *testing.T) {
+func TestContainerKindRows_Unfolded(t *testing.T) {
 	data := testContainers()
 	rows := ContainerKind.Rows(data, nil)
 
@@ -127,7 +127,7 @@ func TestContainerKindToRows_Unfolded(t *testing.T) {
 	}
 }
 
-func TestContainerKindToRows_Folded(t *testing.T) {
+func TestContainerKindRows_Folded(t *testing.T) {
 	data := testContainers()
 	folded := map[string]bool{"sandbox-abc": true}
 	rows := ContainerKind.Rows(data, folded)
@@ -141,9 +141,10 @@ func TestContainerKindToRows_Folded(t *testing.T) {
 	}
 }
 
-func TestContainerKindRowID(t *testing.T) {
+func TestContainerKindFoldKey(t *testing.T) {
 	data := testContainers()
 	folded := map[string]bool{}
+	ContainerKind.Rows(data, folded)
 
 	// Index 0 is sandbox with children
 	id := ContainerKind.FoldKey(data, folded, 0)
@@ -161,6 +162,7 @@ func TestContainerKindRowID(t *testing.T) {
 func TestContainerKindDetail(t *testing.T) {
 	data := testContainers()
 
+	ContainerKind.Rows(data, nil)
 	title, body := ContainerKind.Detail(data, nil, 0)
 	if title != "sandbox-abc" {
 		t.Errorf("Title = %q, want %q", title, "sandbox-abc")
@@ -199,6 +201,7 @@ func TestContainerKindDetail_WithLabels(t *testing.T) {
 		},
 	}
 
+	ContainerKind.Rows(data, nil)
 	_, body := ContainerKind.Detail(data, nil, 0)
 	if !strings.Contains(body, "SandboxID:   labeled-ctr") {
 		t.Error("Should contain SandboxID")
@@ -214,6 +217,7 @@ func TestContainerKindDetail_WithLabels(t *testing.T) {
 func TestContainerSpec(t *testing.T) {
 	// No spec
 	data := testContainers()
+	ContainerKind.Rows(data, nil)
 	title, body := ContainerSpec(data, nil, 0)
 	if title != "" || body != "" {
 		t.Errorf("Expected empty for container without spec, got title=%q", title)
@@ -226,6 +230,7 @@ func TestContainerSpec(t *testing.T) {
 	}
 
 	// Nil data
+	ContainerKind.Rows(nil, nil)
 	title, body = ContainerSpec(nil, nil, 0)
 	if title != "" || body != "" {
 		t.Error("Expected empty for nil data")
@@ -255,6 +260,7 @@ func TestContainerSpec_WithSpec(t *testing.T) {
 			},
 		},
 	}
+	ContainerKind.Rows(data, nil)
 	title, body := ContainerSpec(data, nil, 0)
 	if title != "spec-ctr" {
 		t.Errorf("Title = %q, want %q", title, "spec-ctr")
@@ -281,6 +287,7 @@ func TestContainerKind_NilData(t *testing.T) {
 
 func TestContainerKindCrossRefs(t *testing.T) {
 	data := testContainers()
+	ContainerKind.Rows(data, nil)
 	refs := ContainerKind.CrossRefs(data, nil)
 
 	if len(refs) != 4 {

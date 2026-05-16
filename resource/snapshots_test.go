@@ -34,7 +34,7 @@ func testSnapshots() []snapshots.Info {
 	}
 }
 
-func TestSnapshotKindToRows_Unfolded(t *testing.T) {
+func TestSnapshotKindRows_Unfolded(t *testing.T) {
 	data := testSnapshots()
 	rows := SnapshotKind.Rows(data, nil)
 
@@ -56,7 +56,7 @@ func TestSnapshotKindToRows_Unfolded(t *testing.T) {
 	}
 }
 
-func TestSnapshotKindToRows_Folded(t *testing.T) {
+func TestSnapshotKindRows_Folded(t *testing.T) {
 	data := testSnapshots()
 	folded := map[string]bool{"layer1": true, "rootB": true}
 
@@ -87,11 +87,12 @@ func TestSnapshotKindInitFolded(t *testing.T) {
 	}
 }
 
-func TestSnapshotKindRowID(t *testing.T) {
+func TestSnapshotKindFoldKey(t *testing.T) {
 	data := testSnapshots()
 	folded := map[string]bool{}
 
 	// Index 0 is layer1 (root with children)
+	SnapshotKind.Rows(data, folded)
 	id := SnapshotKind.FoldKey(data, folded, 0)
 	if id != "layer1" {
 		t.Errorf("RowID index 0 = %q, want %q", id, "layer1")
@@ -137,6 +138,7 @@ func TestSnapshotNodeAtIndex(t *testing.T) {
 
 func TestSnapshotKindDetail(t *testing.T) {
 	data := testSnapshots()
+	SnapshotKind.Rows(data, nil)
 
 	title, body := SnapshotKind.Detail(data, nil, 0)
 	if title != "layer1" {
@@ -169,6 +171,7 @@ func TestSnapshotKindDetail_WithLabels(t *testing.T) {
 		},
 	}
 
+	SnapshotKind.Rows(data, nil)
 	_, body := SnapshotKind.Detail(data, nil, 0)
 	if !strings.Contains(body, "Labels:") {
 		t.Error("Should show labels section")
