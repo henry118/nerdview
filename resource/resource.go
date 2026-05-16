@@ -88,7 +88,7 @@ type Tab struct {
 }
 
 // NewTab creates a Tab for the given Kind with initial dimensions.
-func NewTab(kind Kind, width, height int) Tab {
+func NewTab(kind Kind, width, height int) *Tab {
 	cols := fitColumns(kind.Columns(), nil, width)
 	t := table.New(
 		table.WithColumns(cols),
@@ -101,7 +101,7 @@ func NewTab(kind Kind, width, height int) Tab {
 	s.Selected = ui.StyleTableSelected
 	t.SetStyles(s)
 
-	return Tab{
+	return &Tab{
 		Kind:   kind,
 		Table:  t,
 		Folded: make(map[string]bool),
