@@ -24,6 +24,7 @@ import (
 const (
 	IconFolded   = "▸ "
 	IconUnfolded = "▾ "
+	IconBlank    = "  "
 	ConnMid      = "├─ "
 	ConnLast     = "└─ "
 	ConnPipe     = "│  "
@@ -185,6 +186,9 @@ func renderPrefixes(isRoot, isLast, foldable, isFolded bool, prefix string) (dis
 	}
 
 	if isRoot {
+		if foldIcon == "" {
+			foldIcon = IconBlank
+		}
 		displayPrefix = foldIcon
 		childPrefix = ""
 	} else {

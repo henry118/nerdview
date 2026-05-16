@@ -98,8 +98,8 @@ func TestImageKindToRows_Unfolded(t *testing.T) {
 	}
 
 	// Alpine has no children, no fold icon
-	if rows[5][0] != "docker.io/library/alpine:3.19" {
-		t.Errorf("Last row name = %q, want %q", rows[5][0], "docker.io/library/alpine:3.19")
+	if rows[5][0] != "  docker.io/library/alpine:3.19" {
+		t.Errorf("Last row name = %q, want %q", rows[5][0], "  docker.io/library/alpine:3.19")
 	}
 }
 
