@@ -36,7 +36,7 @@ var imageTreeSpec = TreeSpec[ctr.ImageTree]{
 		}
 		return children
 	},
-	ToRow: func(node ctr.ImageTree, hasChildren bool) table.Row {
+	Row: func(node ctr.ImageTree, hasChildren bool) table.Row {
 		size := node.Desc.Size
 		layers := ""
 		if hasChildren {
