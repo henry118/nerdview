@@ -56,7 +56,8 @@ type statsTickMsg struct{}
 
 // debounceMsg fires after the debounce interval to trigger pending refreshes.
 type debounceMsg struct {
-	gen int // Generation counter to ignore stale timers.
+	// Generation counter to ignore stale timers.
+	gen int
 }
 
 // imagesRefreshedMsg is sent when images are reloaded due to a containerd event.

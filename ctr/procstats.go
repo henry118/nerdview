@@ -28,12 +28,17 @@ import (
 
 // DaemonStats holds resource usage metrics for the containerd daemon process.
 type DaemonStats struct {
-	PID     int
-	CPUPct  float64       // Current CPU usage percentage (like htop, per-core).
-	VMS     uint64        // Virtual memory size in bytes.
-	RSS     uint64        // Resident set size in bytes.
-	Threads int           // Number of threads.
-	Uptime  time.Duration // Time since process start.
+	PID int
+	// Current CPU usage percentage (like htop, per-core).
+	CPUPct float64
+	// Virtual memory size in bytes.
+	VMS uint64
+	// Resident set size in bytes.
+	RSS uint64
+	// Number of threads.
+	Threads int
+	// Time since process start.
+	Uptime time.Duration
 }
 
 // cpuSample stores the previous reading for delta-based CPU calculation.

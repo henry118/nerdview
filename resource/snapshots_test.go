@@ -36,7 +36,7 @@ func testSnapshots() []snapshots.Info {
 
 func TestSnapshotKindRows_Unfolded(t *testing.T) {
 	data := testSnapshots()
-	rows := SnapshotKind.Rows(data, nil)
+	rows, _ := SnapshotKind.Rows(data, nil)
 
 	// All 6 snapshots should be visible
 	if len(rows) != 6 {
@@ -60,7 +60,7 @@ func TestSnapshotKindRows_Folded(t *testing.T) {
 	data := testSnapshots()
 	folded := map[string]bool{"layer1": true, "rootB": true}
 
-	rows := SnapshotKind.Rows(data, folded)
+	rows, _ := SnapshotKind.Rows(data, folded)
 
 	// Only root nodes visible: layer1 + rootB = 2
 	if len(rows) != 2 {
@@ -91,15 +91,13 @@ func TestSnapshotKindFoldKey(t *testing.T) {
 	data := testSnapshots()
 	folded := map[string]bool{}
 
-	// Index 0 is layer1 (root with children)
-	SnapshotKind.Rows(data, folded)
-	id := SnapshotKind.FoldKey(data, folded, 0)
+	_, cache := SnapshotKind.Rows(data, folded)
+	id := SnapshotKind.FoldKey(cache, 0)
 	if id != "layer1" {
 		t.Errorf("RowID index 0 = %q, want %q", id, "layer1")
 	}
 
-	// Index 1 is layer2 (non-root, should not be foldable)
-	id = SnapshotKind.FoldKey(data, folded, 1)
+	id = SnapshotKind.FoldKey(cache, 1)
 	if id != "" {
 		t.Errorf("RowID index 1 (non-root) = %q, want empty", id)
 	}
@@ -138,9 +136,9 @@ func TestSnapshotNodeAtIndex(t *testing.T) {
 
 func TestSnapshotKindDetail(t *testing.T) {
 	data := testSnapshots()
-	SnapshotKind.Rows(data, nil)
+	_, cache := SnapshotKind.Rows(data, nil)
 
-	title, body := SnapshotKind.Detail(data, nil, 0)
+	title, body := SnapshotKind.Detail(cache, 0)
 	if title != "layer1" {
 		t.Errorf("Title = %q, want %q", title, "layer1")
 	}
@@ -153,10 +151,10 @@ func TestSnapshotKindDetail(t *testing.T) {
 }
 
 func TestSnapshotKindNameAndColumns(t *testing.T) {
-	if SnapshotKind.Name() != "Snapshots" {
-		t.Errorf("Name = %q, want %q", SnapshotKind.Name(), "Snapshots")
+	if SnapshotKind.Name != "Snapshots" {
+		t.Errorf("Name = %q, want %q", SnapshotKind.Name, "Snapshots")
 	}
-	cols := SnapshotKind.Columns()
+	cols := SnapshotKind.Columns
 	if len(cols) != 3 {
 		t.Errorf("Expected 3 columns, got %d", len(cols))
 	}
@@ -171,8 +169,8 @@ func TestSnapshotKindDetail_WithLabels(t *testing.T) {
 		},
 	}
 
-	SnapshotKind.Rows(data, nil)
-	_, body := SnapshotKind.Detail(data, nil, 0)
+	_, cache := SnapshotKind.Rows(data, nil)
+	_, body := SnapshotKind.Detail(cache, 0)
 	if !strings.Contains(body, "Labels:") {
 		t.Error("Should show labels section")
 	}
@@ -182,24 +180,23 @@ func TestSnapshotKindDetail_WithLabels(t *testing.T) {
 }
 
 func TestSnapshotKind_NilData(t *testing.T) {
-	if rows := SnapshotKind.Rows(nil, nil); rows != nil {
+	rows, cache := SnapshotKind.Rows(nil, nil)
+	if rows != nil {
 		t.Error("Rows(nil) should be nil")
 	}
-	if id := SnapshotKind.FoldKey(nil, nil, 0); id != "" {
+	if id := SnapshotKind.FoldKey(cache, 0); id != "" {
 		t.Error("FoldKey(nil) should be empty")
 	}
 	if folded := SnapshotKind.InitFolded(nil); folded != nil {
 		t.Error("InitFolded(nil) should be nil")
 	}
-	if _, body := SnapshotKind.Detail(nil, nil, 0); body != "" {
+	if _, body := SnapshotKind.Detail(cache, 0); body != "" {
 		t.Error("Detail(nil) should be empty")
 	}
 }
 
 func TestSnapshotKindCrossRefs(t *testing.T) {
-	data := testSnapshots()
-	refs := SnapshotKind.CrossRefs(data, nil)
-	if refs != nil {
-		t.Errorf("Snapshots should have no cross refs, got %v", refs)
+	if SnapshotKind.CrossRefs != nil {
+		t.Error("Snapshots should have no cross refs func")
 	}
 }

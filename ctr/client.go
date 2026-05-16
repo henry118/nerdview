@@ -163,11 +163,13 @@ func (c *Client) Snapshots(ctx context.Context, ns string, snapshotter string) (
 
 // ImageTree represents an image and its content hierarchy (manifests, configs, layers).
 type ImageTree struct {
-	Name        string
-	Desc        ocispec.Descriptor
-	Children    []ImageTree
-	SnapshotKey string            // Chain ID referencing the snapshot tree root (from content labels).
-	Labels      map[string]string // Content store labels for this blob.
+	Name     string
+	Desc     ocispec.Descriptor
+	Children []ImageTree
+	// Chain ID referencing the snapshot tree root (from content labels).
+	SnapshotKey string
+	// Content store labels for this blob.
+	Labels map[string]string
 }
 
 // ImageTrees returns all images in the namespace as trees, walking the content
