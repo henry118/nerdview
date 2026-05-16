@@ -106,6 +106,13 @@ var (
 				Bold(true).
 				Padding(0, 1)
 
+	// StyleTableHeader is the table column header style.
+	StyleTableHeader = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color(ColorBase)).
+				Background(lipgloss.Color(ColorMauve)).
+				Padding(0, 1)
+
 	// StyleTableSelected is the selected row style for all tables.
 	StyleTableSelected = lipgloss.NewStyle().
 				Bold(true).

@@ -119,6 +119,7 @@ func NewTab(kind *Kind, width, height int) *Tab {
 		table.WithWidth(width),
 	)
 	s := table.DefaultStyles()
+	s.Header = ui.StyleTableHeader
 	s.Selected = ui.StyleTableSelected
 	t.SetStyles(s)
 
