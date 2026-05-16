@@ -56,8 +56,8 @@ type TreeSpec[T any] struct {
 	// Sort orders siblings. If nil, insertion order is preserved.
 	Sort func(a, b T) bool
 
-	// ToRow converts an item to column values. Column 0 gets the tree prefix prepended.
-	ToRow func(item T, hasChildren bool) table.Row
+	// Row converts an item to column values. Column 0 gets the tree prefix prepended.
+	Row func(item T, hasChildren bool) table.Row
 }
 
 // BuildResult holds the output of tree building.
@@ -162,7 +162,7 @@ func buildParentIDMode[T any](spec TreeSpec[T], item T, prefix string, isRoot, i
 
 	displayPrefix, childPrefix := renderPrefixes(isRoot, isLast, foldable, isFolded, prefix)
 
-	row := spec.ToRow(item, hasChildren)
+	row := spec.Row(item, hasChildren)
 	row[0] = displayPrefix + row[0]
 
 	result.Rows = append(result.Rows, row)
@@ -188,7 +188,7 @@ func buildChildrenMode[T any](spec TreeSpec[T], item T, prefix string, isRoot, i
 
 	displayPrefix, childPrefix := renderPrefixes(isRoot, isLast, foldable, isFolded, prefix)
 
-	row := spec.ToRow(item, hasChildren)
+	row := spec.Row(item, hasChildren)
 	row[0] = displayPrefix + row[0]
 
 	result.Rows = append(result.Rows, row)

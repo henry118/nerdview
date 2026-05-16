@@ -34,11 +34,11 @@ func testModel() model {
 		namespaces: []string{"default", "k8s.io"},
 		activeNS:   0,
 		resources: []*resource.Tab{
-			new(resource.NewTab(resource.ImageKind, 80, 10)),
-			new(resource.NewTab(resource.SnapshotKind, 80, 10)),
-			new(resource.NewTab(resource.ContainerKind, 80, 10)),
-			new(resource.NewTab(resource.TaskKind, 80, 10)),
-			new(resource.NewTab(resource.EventKind, 80, 10)),
+			resource.NewTab(resource.ImageKind, 80, 10),
+			resource.NewTab(resource.SnapshotKind, 80, 10),
+			resource.NewTab(resource.ContainerKind, 80, 10),
+			resource.NewTab(resource.TaskKind, 80, 10),
+			resource.NewTab(resource.EventKind, 80, 10),
 		},
 		dirtyTabs: make(map[int]bool),
 	}

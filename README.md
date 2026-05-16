@@ -33,7 +33,7 @@ cd nerdview
 make build
 ```
 
-Requires Go 1.26+.
+Requires Go 1.25+ and containerd 2.0+.
 
 ## Usage
 

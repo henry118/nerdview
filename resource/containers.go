@@ -36,7 +36,7 @@ var containerTreeSpec = TreeSpec[ctr.ContainerInfo]{
 		return info.IsSandbox && hasChildren
 	},
 	Sort: func(a, b ctr.ContainerInfo) bool { return a.Container.ID < b.Container.ID },
-	ToRow: func(info ctr.ContainerInfo, _ bool) table.Row {
+	Row: func(info ctr.ContainerInfo, _ bool) table.Row {
 		c := info.Container
 		typ := "container"
 		if info.IsSandbox {

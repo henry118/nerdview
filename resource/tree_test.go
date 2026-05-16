@@ -31,7 +31,7 @@ func testSpec() TreeSpec[testItem] {
 		ID:       func(item testItem) string { return item.id },
 		ParentID: func(item testItem) string { return item.parentID },
 		Sort:     func(a, b testItem) bool { return a.id < b.id },
-		ToRow: func(item testItem, _ bool) table.Row {
+		Row: func(item testItem, _ bool) table.Row {
 			return table.Row{item.id, item.value}
 		},
 	}
@@ -124,7 +124,7 @@ func TestBuildTree_ChildrenMode(t *testing.T) {
 	spec := TreeSpec[testTreeItem]{
 		ID:       func(item testTreeItem) string { return item.name },
 		Children: func(item testTreeItem) []testTreeItem { return item.children },
-		ToRow: func(item testTreeItem, _ bool) table.Row {
+		Row: func(item testTreeItem, _ bool) table.Row {
 			return table.Row{item.name}
 		},
 	}

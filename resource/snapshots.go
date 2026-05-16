@@ -29,7 +29,7 @@ var snapshotTreeSpec = TreeSpec[snapshots.Info]{
 		return hasChildren && info.Parent == ""
 	},
 	Sort: func(a, b snapshots.Info) bool { return a.Name < b.Name },
-	ToRow: func(info snapshots.Info, _ bool) table.Row {
+	Row: func(info snapshots.Info, _ bool) table.Row {
 		return table.Row{
 			ShortDigest(info.Name),
 			info.Kind.String(),
