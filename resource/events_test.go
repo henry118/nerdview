@@ -27,7 +27,7 @@ func TestEventKindRows(t *testing.T) {
 		{Timestamp: now.Add(time.Second), Namespace: "k8s.io", Topic: "/containers/delete"},
 	}
 
-	rows := EventKind.Rows(data, nil)
+	rows, _ := EventKind.Rows(data, nil)
 
 	if len(rows) != 2 {
 		t.Fatalf("Expected 2 rows, got %d", len(rows))
@@ -49,7 +49,8 @@ func TestEventKindDetail(t *testing.T) {
 		{Timestamp: now, Namespace: "default", Topic: "/tasks/exit"},
 	}
 
-	title, body := EventKind.Detail(data, nil, 0)
+	_, cache := EventKind.Rows(data, nil)
+	title, body := EventKind.Detail(cache, 0)
 
 	if title != "/tasks/exit" {
 		t.Errorf("Title = %q, want %q", title, "/tasks/exit")
@@ -79,7 +80,8 @@ func TestEventKindDetail_WithPayload(t *testing.T) {
 		},
 	}
 
-	_, body := EventKind.Detail(data, nil, 0)
+	_, cache := EventKind.Rows(data, nil)
+	_, body := EventKind.Detail(cache, 0)
 
 	if !strings.Contains(body, "--- Payload ---") {
 		t.Error("Body should contain payload section")
@@ -98,7 +100,8 @@ func TestEventKindDetail_NilPayload(t *testing.T) {
 		{Timestamp: now, Namespace: "default", Topic: "/images/create", Payload: nil},
 	}
 
-	_, body := EventKind.Detail(data, nil, 0)
+	_, cache := EventKind.Rows(data, nil)
+	_, body := EventKind.Detail(cache, 0)
 
 	if strings.Contains(body, "Payload") {
 		t.Error("Body should NOT contain payload section when payload is nil")
@@ -106,29 +109,30 @@ func TestEventKindDetail_NilPayload(t *testing.T) {
 }
 
 func TestEventKindNameAndColumns(t *testing.T) {
-	if EventKind.Name() != "Events" {
-		t.Errorf("Name = %q, want %q", EventKind.Name(), "Events")
+	if EventKind.Name != "Events" {
+		t.Errorf("Name = %q, want %q", EventKind.Name, "Events")
 	}
-	cols := EventKind.Columns()
+	cols := EventKind.Columns
 	if len(cols) != 3 {
 		t.Errorf("Expected 3 columns, got %d", len(cols))
 	}
 }
 
 func TestEventKind_NilAndEdgeCases(t *testing.T) {
-	if rows := EventKind.Rows(nil, nil); rows != nil {
+	rows, cache := EventKind.Rows(nil, nil)
+	if rows != nil {
 		t.Error("Rows(nil) should be nil")
 	}
-	if id := EventKind.FoldKey(nil, nil, 0); id != "" {
-		t.Error("FoldKey should always be empty")
+	if EventKind.FoldKey != nil {
+		t.Error("FoldKey should be nil")
 	}
-	if folded := EventKind.InitFolded(nil); folded != nil {
-		t.Error("InitFolded should always be nil")
+	if EventKind.InitFolded != nil {
+		t.Error("InitFolded should be nil")
 	}
-	if refs := EventKind.CrossRefs(nil, nil); refs != nil {
-		t.Error("CrossRefs should always be nil")
+	if EventKind.CrossRefs != nil {
+		t.Error("CrossRefs should be nil")
 	}
-	if _, body := EventKind.Detail(nil, nil, 0); body != "" {
+	if _, body := EventKind.Detail(cache, 0); body != "" {
 		t.Error("Detail(nil) should be empty")
 	}
 }

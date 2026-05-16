@@ -42,9 +42,9 @@ func (m model) View() string {
 	var tabs []string
 	for i, tab := range m.resources {
 		if i == m.activeRes {
-			tabs = append(tabs, ui.StyleTabActive.Render(tab.Kind.Name()))
+			tabs = append(tabs, ui.StyleTabActive.Render(tab.Name()))
 		} else {
-			tabs = append(tabs, ui.StyleTabInactive.Render(tab.Kind.Name()))
+			tabs = append(tabs, ui.StyleTabInactive.Render(tab.Name()))
 		}
 	}
 	tabBar := strings.Join(tabs, "")
@@ -75,7 +75,7 @@ func (m model) View() string {
 	if len(m.navHistory) > 0 {
 		helpOpts = append(helpOpts, ui.WithBack())
 	}
-	if m.activeRes == tabContainers {
+	if tab.HasSpec() {
 		helpOpts = append(helpOpts, ui.WithSpec())
 	}
 	if rowCount > 0 {

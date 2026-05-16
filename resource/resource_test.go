@@ -98,49 +98,14 @@ func TestShortDigest(t *testing.T) {
 	}
 }
 
-// mockKind implements Kind for testing with configurable callbacks.
-type mockKind struct {
-	RowsFunc      func(data any, folded map[string]bool) []table.Row
-	FoldKeyFunc   func(data any, folded map[string]bool, index int) string
-	InitFoldFunc  func(data any) map[string]bool
-	CrossRefsFunc func(data any, folded map[string]bool) []string
-}
-
-func (m mockKind) Name() string    { return "Test" }
-func (m mockKind) Columns() []Column { return []Column{{Title: "Name", MinWidth: 10, Flex: true}} }
-
-func (m mockKind) Rows(data any, folded map[string]bool) []table.Row {
-	return m.RowsFunc(data, folded)
-}
-
-func (m mockKind) FoldKey(data any, folded map[string]bool, index int) string {
-	if m.FoldKeyFunc == nil {
-		return ""
-	}
-	return m.FoldKeyFunc(data, folded, index)
-}
-
-func (m mockKind) InitFolded(data any) map[string]bool {
-	if m.InitFoldFunc == nil {
-		return nil
-	}
-	return m.InitFoldFunc(data)
-}
-
-func (m mockKind) Detail(_ any, _ map[string]bool, _ int) (string, string) {
-	return "", ""
-}
-
-func (m mockKind) CrossRefs(data any, folded map[string]bool) []string {
-	if m.CrossRefsFunc == nil {
-		return nil
-	}
-	return m.CrossRefsFunc(data, folded)
+type mockCache struct {
+	items  []string
+	folded map[string]bool
 }
 
 func TestTab_FoldUnfold(t *testing.T) {
-	kind := mockKind{
-		RowsFunc: func(data any, folded map[string]bool) []table.Row {
+	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
+		Rows: func(data any, folded map[string]bool) ([]table.Row, any) {
 			items := data.([]string)
 			var rows []table.Row
 			for _, item := range items {
@@ -151,17 +116,17 @@ func TestTab_FoldUnfold(t *testing.T) {
 					rows = append(rows, table.Row{"  child-of-" + item})
 				}
 			}
-			return rows
+			return rows, mockCache{items: items, folded: folded}
 		},
-		FoldKeyFunc: func(data any, folded map[string]bool, index int) string {
-			items := data.([]string)
+		FoldKey: func(cache any, index int) string {
+			mc := cache.(mockCache)
 			rowIdx := 0
-			for _, item := range items {
+			for _, item := range mc.items {
 				if rowIdx == index {
 					return item
 				}
 				rowIdx++
-				if !folded[item] {
+				if !mc.folded[item] {
 					rowIdx++
 				}
 			}
@@ -169,7 +134,7 @@ func TestTab_FoldUnfold(t *testing.T) {
 		},
 	}
 
-	tab := NewTab(kind, 80, 10)
+	tab := NewTab(&kind, 80, 10)
 	tab.UpdateData([]string{"parent1", "parent2"})
 
 	if len(tab.Table.Rows()) != 4 {
@@ -188,8 +153,8 @@ func TestTab_FoldUnfold(t *testing.T) {
 }
 
 func TestTab_FoldPreservedOnRefresh(t *testing.T) {
-	kind := mockKind{
-		RowsFunc: func(data any, folded map[string]bool) []table.Row {
+	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
+		Rows: func(data any, folded map[string]bool) ([]table.Row, any) {
 			items := data.([]string)
 			var rows []table.Row
 			for _, item := range items {
@@ -200,23 +165,23 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 					rows = append(rows, table.Row{"  child-of-" + item})
 				}
 			}
-			return rows
+			return rows, mockCache{items: items, folded: folded}
 		},
-		FoldKeyFunc: func(data any, folded map[string]bool, index int) string {
-			items := data.([]string)
+		FoldKey: func(cache any, index int) string {
+			mc := cache.(mockCache)
 			rowIdx := 0
-			for _, item := range items {
+			for _, item := range mc.items {
 				if rowIdx == index {
 					return item
 				}
 				rowIdx++
-				if !folded[item] {
+				if !mc.folded[item] {
 					rowIdx++
 				}
 			}
 			return ""
 		},
-		InitFoldFunc: func(data any) map[string]bool {
+		InitFolded: func(data any) map[string]bool {
 			items := data.([]string)
 			folded := make(map[string]bool)
 			for _, item := range items {
@@ -226,7 +191,7 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 		},
 	}
 
-	tab := NewTab(kind, 80, 10)
+	tab := NewTab(&kind, 80, 10)
 	tab.UpdateData([]string{"parent1", "parent2"})
 
 	if len(tab.Table.Rows()) != 2 {
@@ -250,8 +215,8 @@ func TestTab_FoldPreservedOnRefresh(t *testing.T) {
 }
 
 func TestTab_FoldFromChild(t *testing.T) {
-	kind := mockKind{
-		RowsFunc: func(data any, folded map[string]bool) []table.Row {
+	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
+		Rows: func(data any, folded map[string]bool) ([]table.Row, any) {
 			items := data.([]string)
 			var rows []table.Row
 			for _, item := range items {
@@ -262,17 +227,17 @@ func TestTab_FoldFromChild(t *testing.T) {
 					rows = append(rows, table.Row{"  child-of-" + item})
 				}
 			}
-			return rows
+			return rows, mockCache{items: items, folded: folded}
 		},
-		FoldKeyFunc: func(data any, folded map[string]bool, index int) string {
-			items := data.([]string)
+		FoldKey: func(cache any, index int) string {
+			mc := cache.(mockCache)
 			rowIdx := 0
-			for _, item := range items {
+			for _, item := range mc.items {
 				if rowIdx == index {
 					return item
 				}
 				rowIdx++
-				if !folded[item] {
+				if !mc.folded[item] {
 					rowIdx++
 				}
 			}
@@ -280,7 +245,7 @@ func TestTab_FoldFromChild(t *testing.T) {
 		},
 	}
 
-	tab := NewTab(kind, 80, 10)
+	tab := NewTab(&kind, 80, 10)
 	tab.UpdateData([]string{"parent1", "parent2"})
 
 	// Move cursor to child of parent1 (row index 1)
@@ -300,8 +265,8 @@ func TestTab_FoldFromChild(t *testing.T) {
 }
 
 func TestTab_RevealRow(t *testing.T) {
-	kind := mockKind{
-		RowsFunc: func(data any, folded map[string]bool) []table.Row {
+	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
+		Rows: func(data any, folded map[string]bool) ([]table.Row, any) {
 			items := data.([]string)
 			var rows []table.Row
 			for _, item := range items {
@@ -312,23 +277,23 @@ func TestTab_RevealRow(t *testing.T) {
 					rows = append(rows, table.Row{"  child-of-" + item})
 				}
 			}
-			return rows
+			return rows, mockCache{items: items, folded: folded}
 		},
-		FoldKeyFunc: func(data any, folded map[string]bool, index int) string {
-			items := data.([]string)
+		FoldKey: func(cache any, index int) string {
+			mc := cache.(mockCache)
 			rowIdx := 0
-			for _, item := range items {
+			for _, item := range mc.items {
 				if rowIdx == index {
 					return item
 				}
 				rowIdx++
-				if !folded[item] {
+				if !mc.folded[item] {
 					rowIdx++
 				}
 			}
 			return ""
 		},
-		InitFoldFunc: func(data any) map[string]bool {
+		InitFolded: func(data any) map[string]bool {
 			items := data.([]string)
 			folded := make(map[string]bool)
 			for _, item := range items {
@@ -338,7 +303,7 @@ func TestTab_RevealRow(t *testing.T) {
 		},
 	}
 
-	tab := NewTab(kind, 80, 10)
+	tab := NewTab(&kind, 80, 10)
 	tab.UpdateData([]string{"parent1", "parent2"})
 
 	// Both folded — only 2 rows visible
@@ -369,12 +334,12 @@ func TestTab_RevealRow(t *testing.T) {
 }
 
 func TestTab_SetWidth(t *testing.T) {
-	kind := mockKind{
-		RowsFunc: func(data any, _ map[string]bool) []table.Row {
-			return []table.Row{{"hello"}}
+	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
+		Rows: func(data any, _ map[string]bool) ([]table.Row, any) {
+			return []table.Row{{"hello"}}, nil
 		},
 	}
-	tab := NewTab(kind, 80, 10)
+	tab := NewTab(&kind, 80, 10)
 	tab.UpdateData([]string{"x"})
 	tab.SetWidth(120)
 	if tab.Table.Width() != 120 {
@@ -383,12 +348,12 @@ func TestTab_SetWidth(t *testing.T) {
 }
 
 func TestTab_SelectedDetail(t *testing.T) {
-	kind := mockKind{
-		RowsFunc: func(data any, _ map[string]bool) []table.Row {
-			return []table.Row{{"item1"}, {"item2"}}
+	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
+		Rows: func(data any, _ map[string]bool) ([]table.Row, any) {
+			return []table.Row{{"item1"}, {"item2"}}, nil
 		},
 	}
-	tab := NewTab(kind, 80, 10)
+	tab := NewTab(&kind, 80, 10)
 	tab.UpdateData([]string{"a", "b"})
 
 	title, body := tab.SelectedDetail()
@@ -398,17 +363,17 @@ func TestTab_SelectedDetail(t *testing.T) {
 }
 
 func TestTab_CrossRef(t *testing.T) {
-	kind := mockKind{
-		RowsFunc: func(data any, _ map[string]bool) []table.Row {
+	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
+		Rows: func(data any, _ map[string]bool) ([]table.Row, any) {
 			items := data.([]string)
 			rows := make([]table.Row, len(items))
 			for i, item := range items {
 				rows[i] = table.Row{item}
 			}
-			return rows
+			return rows, items
 		},
-		CrossRefsFunc: func(data any, _ map[string]bool) []string {
-			items := data.([]string)
+		CrossRefs: func(cache any) []string {
+			items := cache.([]string)
 			refs := make([]string, len(items))
 			for i, item := range items {
 				refs[i] = "ref-" + item
@@ -417,7 +382,7 @@ func TestTab_CrossRef(t *testing.T) {
 		},
 	}
 
-	tab := NewTab(kind, 80, 10)
+	tab := NewTab(&kind, 80, 10)
 	tab.UpdateData([]string{"a", "b", "c"})
 
 	if got := tab.CrossRef(0); got != "ref-a" {

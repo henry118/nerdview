@@ -23,14 +23,9 @@ import (
 	"github.com/henry118/nerdview/ctr"
 )
 
-type taskKind struct{}
-
-var TaskKind Kind = taskKind{}
-
-func (taskKind) Name() string { return "Tasks" }
-
-func (taskKind) Columns() []Column {
-	return []Column{
+var TaskKind = Kind{
+	Name: "Tasks",
+	Columns: []Column{
 		{Title: "ID", MinWidth: 8, Flex: true},
 		{Title: "CONTAINER", MinWidth: 8, Flex: true},
 		{Title: "TYPE", MinWidth: 4},
@@ -38,45 +33,50 @@ func (taskKind) Columns() []Column {
 		{Title: "STATUS", MinWidth: 7},
 		{Title: "CMDLINE", MinWidth: 10, Flex: true},
 		{Title: "STARTED", MinWidth: 19, Flex: true},
-	}
-}
-
-func (taskKind) Rows(data any, _ map[string]bool) []table.Row {
-	tasks, ok := data.([]ctr.TaskInfo)
-	if !ok || len(tasks) == 0 {
-		return nil
-	}
-	rows := make([]table.Row, len(tasks))
-	for i, t := range tasks {
-		id := t.ContainerID
-		typ := "init"
-		if t.ExecID != "" {
-			id = t.ExecID
-			typ = "exec"
+	},
+	Rows: func(data any, _ map[string]bool) ([]table.Row, any) {
+		tasks, ok := data.([]ctr.TaskInfo)
+		if !ok || len(tasks) == 0 {
+			return nil, nil
 		}
-		rows[i] = table.Row{
-			id,
-			t.ContainerID,
-			typ,
-			fmt.Sprintf("%d", t.Process.Pid),
-			t.Process.Status.String(),
-			t.Cmdline,
-			t.StartedAt,
+		rows := make([]table.Row, len(tasks))
+		for i, t := range tasks {
+			id := t.ContainerID
+			typ := "init"
+			if t.ExecID != "" {
+				id = t.ExecID
+				typ = "exec"
+			}
+			rows[i] = table.Row{
+				id,
+				t.ContainerID,
+				typ,
+				fmt.Sprintf("%d", t.Process.Pid),
+				t.Process.Status.String(),
+				t.Cmdline,
+				t.StartedAt,
+			}
 		}
-	}
-	return rows
-}
-
-func (taskKind) FoldKey(_ any, _ map[string]bool, _ int) string { return "" }
-
-func (taskKind) InitFolded(_ any) map[string]bool { return nil }
-
-func (taskKind) Detail(data any, _ map[string]bool, index int) (string, string) {
-	tasks, ok := data.([]ctr.TaskInfo)
-	if !ok || index < 0 || index >= len(tasks) {
-		return "", ""
-	}
-	return formatTaskDetail(tasks[index])
+		return rows, tasks
+	},
+	Detail: func(cache any, index int) (string, string) {
+		tasks, ok := cache.([]ctr.TaskInfo)
+		if !ok || index < 0 || index >= len(tasks) {
+			return "", ""
+		}
+		return formatTaskDetail(tasks[index])
+	},
+	CrossRefs: func(cache any) []string {
+		tasks, ok := cache.([]ctr.TaskInfo)
+		if !ok {
+			return nil
+		}
+		refs := make([]string, len(tasks))
+		for i, t := range tasks {
+			refs[i] = t.ContainerID
+		}
+		return refs
+	},
 }
 
 func formatTaskDetail(t ctr.TaskInfo) (string, string) {
@@ -135,18 +135,6 @@ func formatTaskDetail(t ctr.TaskInfo) (string, string) {
 		}
 	}
 	return taskID(t), b.String()
-}
-
-func (taskKind) CrossRefs(data any, _ map[string]bool) []string {
-	tasks, ok := data.([]ctr.TaskInfo)
-	if !ok {
-		return nil
-	}
-	refs := make([]string, len(tasks))
-	for i, t := range tasks {
-		refs[i] = t.ContainerID
-	}
-	return refs
 }
 
 func taskID(t ctr.TaskInfo) string {

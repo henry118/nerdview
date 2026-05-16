@@ -46,10 +46,14 @@ const (
 type viewMode int
 
 const (
-	modeNormal            viewMode = iota // Default table navigation.
-	modeDialog                            // Detail popup is open.
-	modeNSSelect                          // Namespace selector overlay.
-	modeSnapshotterSelect                 // Snapshotter selector overlay.
+	// Default table navigation.
+	modeNormal viewMode = iota
+	// Detail popup is open.
+	modeDialog
+	// Namespace selector overlay.
+	modeNSSelect
+	// Snapshotter selector overlay.
+	modeSnapshotterSelect
 )
 
 // navState stores the position before a cross-tab navigation for "go back".
@@ -60,26 +64,46 @@ type navState struct {
 
 // model is the top-level bubbletea model for the TUI.
 type model struct {
-	client       *ctr.Client      // Containerd gRPC client.
-	namespaces   []string         // Available namespaces.
-	activeNS     int              // Index into namespaces.
-	snapshotter  string           // Active snapshotter name.
-	snapshotters []string         // Available snapshotters.
-	snCursor     int              // Cursor for snapshotter selector.
-	resources    []*resource.Tab  // One tab per resource type.
-	activeRes    int              // Index of the active tab.
-	events       []resource.Event // Buffered events for the events tab.
-	dialog       ui.DialogModel   // Detail/spec popup.
-	mode         viewMode         // Current UI mode.
-	nsCursor     int              // Cursor for namespace selector.
-	daemonPID    int              // Containerd daemon PID.
-	daemonStats  ctr.DaemonStats  // Latest daemon resource stats.
-	navHistory   []navState       // Stack for cross-tab back navigation.
-	dirtyTabs    map[int]bool     // Tabs needing refresh due to pending events.
-	debounceGen  int              // Generation counter to discard stale debounce timers.
-	width        int              // Terminal width.
-	height       int              // Terminal height.
-	err          error            // Last error to display in status bar.
+	// Containerd gRPC client.
+	client *ctr.Client
+	// Available namespaces.
+	namespaces []string
+	// Index into namespaces.
+	activeNS int
+	// Active snapshotter name.
+	snapshotter string
+	// Available snapshotters.
+	snapshotters []string
+	// Cursor for snapshotter selector.
+	snCursor int
+	// One tab per resource type.
+	resources []*resource.Tab
+	// Index of the active tab.
+	activeRes int
+	// Buffered events for the events tab.
+	events []resource.Event
+	// Detail/spec popup.
+	dialog ui.DialogModel
+	// Current UI mode.
+	mode viewMode
+	// Cursor for namespace selector.
+	nsCursor int
+	// Containerd daemon PID.
+	daemonPID int
+	// Latest daemon resource stats.
+	daemonStats ctr.DaemonStats
+	// Stack for cross-tab back navigation.
+	navHistory []navState
+	// Tabs needing refresh due to pending events.
+	dirtyTabs map[int]bool
+	// Generation counter to discard stale debounce timers.
+	debounceGen int
+	// Terminal width.
+	width int
+	// Terminal height.
+	height int
+	// Last error to display in status bar.
+	err error
 }
 
 // newModel creates the initial model with default state.
@@ -89,11 +113,11 @@ func newModel(client *ctr.Client, namespace string) model {
 		namespaces:  []string{namespace},
 		snapshotter: "overlayfs",
 		resources: []*resource.Tab{
-			resource.NewTab(resource.ImageKind, 80, 10),
-			resource.NewTab(resource.SnapshotKind, 80, 10),
-			resource.NewTab(resource.ContainerKind, 80, 10),
-			resource.NewTab(resource.TaskKind, 80, 10),
-			resource.NewTab(resource.EventKind, 80, 10),
+			resource.NewTab(&resource.ImageKind, 80, 10),
+			resource.NewTab(&resource.SnapshotKind, 80, 10),
+			resource.NewTab(&resource.ContainerKind, 80, 10),
+			resource.NewTab(&resource.TaskKind, 80, 10),
+			resource.NewTab(&resource.EventKind, 80, 10),
 		},
 		dialog:    ui.NewDialog(80, 24),
 		dirtyTabs: make(map[int]bool),
@@ -409,13 +433,11 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Spec):
-		if m.activeRes == tabContainers {
-			tab := m.resources[tabContainers]
-			title, body := resource.ContainerSpec(tab.RawData, tab.Folded, tab.Table.Cursor())
-			if title != "" {
-				m.dialog.SetContent(title, body)
-				m.mode = modeDialog
-			}
+		tab := m.resources[m.activeRes]
+		title, body := tab.Spec()
+		if title != "" {
+			m.dialog.SetContent(title, body)
+			m.mode = modeDialog
 		}
 		return m, nil
 

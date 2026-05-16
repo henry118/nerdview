@@ -30,66 +30,47 @@ type Event struct {
 	Payload   any
 }
 
-type eventKind struct{}
-
-var EventKind Kind = eventKind{}
-
-func (eventKind) Name() string { return "Events" }
-
-func (eventKind) Columns() []Column {
-	return []Column{
+var EventKind = Kind{
+	Name: "Events",
+	Columns: []Column{
 		{Title: "TIME", MinWidth: 14},
 		{Title: "NAMESPACE", MinWidth: 14},
 		{Title: "TOPIC", MinWidth: 20, Flex: true},
-	}
-}
-
-func (eventKind) Rows(data any, _ map[string]bool) []table.Row {
-	evts, ok := data.([]Event)
-	if !ok || len(evts) == 0 {
-		return nil
-	}
-	rows := make([]table.Row, len(evts))
-	for i, e := range evts {
-		rows[i] = table.Row{
-			e.Timestamp.Format("15:04:05.000"),
-			e.Namespace,
-			e.Topic,
+	},
+	Rows: func(data any, _ map[string]bool) ([]table.Row, any) {
+		evts, ok := data.([]Event)
+		if !ok || len(evts) == 0 {
+			return nil, nil
 		}
-	}
-	return rows
-}
-
-func (eventKind) FoldKey(_ any, _ map[string]bool, _ int) string {
-	return ""
-}
-
-func (eventKind) InitFolded(_ any) map[string]bool {
-	return nil
-}
-
-func (eventKind) Detail(data any, _ map[string]bool, index int) (string, string) {
-	evts, ok := data.([]Event)
-	if !ok || index < 0 || index >= len(evts) {
-		return "", ""
-	}
-	e := evts[index]
-	var b strings.Builder
-	fmt.Fprintf(&b, "Timestamp:  %s\n", e.Timestamp.Format(time.RFC3339Nano))
-	fmt.Fprintf(&b, "Namespace:  %s\n", e.Namespace)
-	fmt.Fprintf(&b, "Topic:      %s\n", e.Topic)
-	if e.Payload != nil {
-		fmt.Fprintf(&b, "\n--- Payload ---\n")
-		data, err := json.MarshalIndent(e.Payload, "", "  ")
-		if err == nil {
-			fmt.Fprintf(&b, "%s\n", data)
-		} else {
-			fmt.Fprintf(&b, "%+v\n", e.Payload)
+		rows := make([]table.Row, len(evts))
+		for i, e := range evts {
+			rows[i] = table.Row{
+				e.Timestamp.Format("15:04:05.000"),
+				e.Namespace,
+				e.Topic,
+			}
 		}
-	}
-	return e.Topic, b.String()
-}
-
-func (eventKind) CrossRefs(_ any, _ map[string]bool) []string {
-	return nil
+		return rows, evts
+	},
+	Detail: func(cache any, index int) (string, string) {
+		evts, ok := cache.([]Event)
+		if !ok || index < 0 || index >= len(evts) {
+			return "", ""
+		}
+		e := evts[index]
+		var b strings.Builder
+		fmt.Fprintf(&b, "Timestamp:  %s\n", e.Timestamp.Format(time.RFC3339Nano))
+		fmt.Fprintf(&b, "Namespace:  %s\n", e.Namespace)
+		fmt.Fprintf(&b, "Topic:      %s\n", e.Topic)
+		if e.Payload != nil {
+			fmt.Fprintf(&b, "\n--- Payload ---\n")
+			data, err := json.MarshalIndent(e.Payload, "", "  ")
+			if err == nil {
+				fmt.Fprintf(&b, "%s\n", data)
+			} else {
+				fmt.Fprintf(&b, "%+v\n", e.Payload)
+			}
+		}
+		return e.Topic, b.String()
+	},
 }

@@ -30,7 +30,8 @@ type EventMsg struct {
 	Namespace string
 	Topic     string
 	Timestamp time.Time
-	Event     any // Decoded event payload (e.g. *apievents.ImageCreate, *apievents.TaskExit)
+	// Decoded event payload (e.g. *apievents.ImageCreate, *apievents.TaskExit).
+	Event any
 }
 
 // EventErrMsg is sent when the event subscription encounters an error.
