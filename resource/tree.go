@@ -24,6 +24,7 @@ import (
 const (
 	IconFolded   = "▸ "
 	IconUnfolded = "▾ "
+	IconBlank    = "  "
 	ConnMid      = "├─ "
 	ConnLast     = "└─ "
 	ConnPipe     = "│  "
@@ -72,20 +73,15 @@ func BuildTree[T any](spec TreeSpec[T], items []T, folded map[string]bool) Build
 		return BuildResult[T]{}
 	}
 
-	var result BuildResult[T]
+	var getChildren func(item T) []T
+	var roots []T
 
 	if spec.Children != nil {
-		for _, item := range items {
-			result = buildChildrenMode(spec, item, "", true, false, folded, result)
-		}
+		getChildren = spec.Children
+		roots = items
 	} else {
-		byID := make(map[string]T, len(items))
 		children := make(map[string][]T)
-		var roots []T
-
 		for _, item := range items {
-			id := spec.ID(item)
-			byID[id] = item
 			parentID := spec.ParentID(item)
 			if parentID == "" {
 				roots = append(roots, item)
@@ -93,7 +89,6 @@ func BuildTree[T any](spec TreeSpec[T], items []T, folded map[string]bool) Build
 				children[parentID] = append(children[parentID], item)
 			}
 		}
-
 		if spec.Sort != nil {
 			sort.Slice(roots, func(i, j int) bool { return spec.Sort(roots[i], roots[j]) })
 			for k := range children {
@@ -101,13 +96,14 @@ func BuildTree[T any](spec TreeSpec[T], items []T, folded map[string]bool) Build
 				sort.Slice(kids, func(i, j int) bool { return spec.Sort(kids[i], kids[j]) })
 			}
 		}
-
-		for i, root := range roots {
-			isLast := i == len(roots)-1
-			result = buildParentIDMode(spec, root, "", true, isLast, children, folded, result)
-		}
+		getChildren = func(item T) []T { return children[spec.ID(item)] }
 	}
 
+	var result BuildResult[T]
+	for i, root := range roots {
+		isLast := i == len(roots)-1
+		result = buildNodes(spec, root, "", true, isLast, getChildren, folded, result)
+	}
 	return result
 }
 
@@ -153,9 +149,9 @@ func isFoldable[T any](spec TreeSpec[T], item T, hasChildren bool) bool {
 	return hasChildren
 }
 
-func buildParentIDMode[T any](spec TreeSpec[T], item T, prefix string, isRoot, isLast bool, children map[string][]T, folded map[string]bool, result BuildResult[T]) BuildResult[T] {
+func buildNodes[T any](spec TreeSpec[T], item T, prefix string, isRoot, isLast bool, getChildren func(T) []T, folded map[string]bool, result BuildResult[T]) BuildResult[T] {
 	id := spec.ID(item)
-	kids := children[id]
+	kids := getChildren(item)
 	hasChildren := len(kids) > 0
 	foldable := isFoldable(spec, item, hasChildren)
 	isFolded := foldable && folded[id]
@@ -174,33 +170,7 @@ func buildParentIDMode[T any](spec TreeSpec[T], item T, prefix string, isRoot, i
 
 	for i, child := range kids {
 		childIsLast := i == len(kids)-1
-		result = buildParentIDMode(spec, child, childPrefix, false, childIsLast, children, folded, result)
-	}
-	return result
-}
-
-func buildChildrenMode[T any](spec TreeSpec[T], item T, prefix string, isRoot, isLast bool, folded map[string]bool, result BuildResult[T]) BuildResult[T] {
-	id := spec.ID(item)
-	kids := spec.Children(item)
-	hasChildren := len(kids) > 0
-	foldable := isFoldable(spec, item, hasChildren)
-	isFolded := foldable && folded[id]
-
-	displayPrefix, childPrefix := renderPrefixes(isRoot, isLast, foldable, isFolded, prefix)
-
-	row := spec.Row(item, hasChildren)
-	row[0] = displayPrefix + row[0]
-
-	result.Rows = append(result.Rows, row)
-	result.Nodes = append(result.Nodes, TreeNode[T]{Item: item, ID: id, HasChildren: hasChildren})
-
-	if isFolded {
-		return result
-	}
-
-	for i, child := range kids {
-		childIsLast := i == len(kids)-1
-		result = buildChildrenMode(spec, child, childPrefix, false, childIsLast, folded, result)
+		result = buildNodes(spec, child, childPrefix, false, childIsLast, getChildren, folded, result)
 	}
 	return result
 }
@@ -216,6 +186,9 @@ func renderPrefixes(isRoot, isLast, foldable, isFolded bool, prefix string) (dis
 	}
 
 	if isRoot {
+		if foldIcon == "" {
+			foldIcon = IconBlank
+		}
 		displayPrefix = foldIcon
 		childPrefix = ""
 	} else {

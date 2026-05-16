@@ -119,8 +119,8 @@ func TestContainerKindToRows_Unfolded(t *testing.T) {
 	}
 
 	// Standalone
-	if rows[3][0] != "standalone-ctr" {
-		t.Errorf("Standalone = %q, want %q", rows[3][0], "standalone-ctr")
+	if rows[3][0] != "  standalone-ctr" {
+		t.Errorf("Standalone = %q, want %q", rows[3][0], "  standalone-ctr")
 	}
 	if rows[3][1] != "container" {
 		t.Errorf("Standalone type = %q, want %q", rows[3][1], "container")

@@ -59,7 +59,7 @@ func TestBuildTree_ParentIDMode(t *testing.T) {
 	if result.Rows[2][0] != ConnLast+"child2" {
 		t.Errorf("Row 2 = %q, want %q", result.Rows[2][0], ConnLast+"child2")
 	}
-	if result.Rows[3][0] != "root2" {
+	if result.Rows[3][0] != "  root2" {
 		t.Errorf("Row 3 = %q, want %q", result.Rows[3][0], "root2")
 	}
 }
@@ -80,7 +80,7 @@ func TestBuildTree_Folded(t *testing.T) {
 	if result.Rows[0][0] != IconFolded+"root1" {
 		t.Errorf("Row 0 = %q, want %q", result.Rows[0][0], IconFolded+"root1")
 	}
-	if result.Rows[1][0] != "root2" {
+	if result.Rows[1][0] != "  root2" {
 		t.Errorf("Row 1 = %q, want %q", result.Rows[1][0], "root2")
 	}
 }
@@ -143,7 +143,7 @@ func TestBuildTree_ChildrenMode(t *testing.T) {
 	if result.Rows[2][0] != ConnLast+"child2" {
 		t.Errorf("Row 2 = %q, want %q", result.Rows[2][0], ConnLast+"child2")
 	}
-	if result.Rows[3][0] != "standalone" {
+	if result.Rows[3][0] != "  standalone" {
 		t.Errorf("Row 3 = %q, want %q", result.Rows[3][0], "standalone")
 	}
 }
@@ -168,8 +168,8 @@ func TestBuildTree_CustomFoldable(t *testing.T) {
 		t.Errorf("Row 0 = %q, want fold icon", result.Rows[0][0])
 	}
 	// root2 has children but is not foldable, so no fold icon
-	if result.Rows[2][0] != "root2" {
-		t.Errorf("Row 2 = %q, want no fold icon", result.Rows[2][0])
+	if result.Rows[2][0] != "  root2" {
+		t.Errorf("Row 2 = %q, want blank indent", result.Rows[2][0])
 	}
 }
 
