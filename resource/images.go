@@ -53,13 +53,15 @@ var imageTreeSpec = TreeSpec[ctr.ImageTree]{
 	},
 }
 
-type imageKind struct{}
+type imageKind struct {
+	cache BuildResult[ctr.ImageTree]
+}
 
-var ImageKind Kind = imageKind{}
+var ImageKind Kind = &imageKind{}
 
-func (imageKind) Name() string { return "Images" }
+func (k *imageKind) Name() string { return "Images" }
 
-func (imageKind) Columns() []Column {
+func (k *imageKind) Columns() []Column {
 	return []Column{
 		{Title: "NAME", MinWidth: 20, Flex: true},
 		{Title: "TYPE", MinWidth: 12},
@@ -69,31 +71,29 @@ func (imageKind) Columns() []Column {
 	}
 }
 
-func (imageKind) Rows(data any, folded map[string]bool) []table.Row {
+// Rows rebuilds the tree cache. Must be called before FoldKey/Detail/CrossRefs.
+func (k *imageKind) Rows(data any, folded map[string]bool) []table.Row {
 	trees := toSortedImages(data)
 	if trees == nil {
+		k.cache = BuildResult[ctr.ImageTree]{} // Clear stale cache on empty data.
 		return nil
 	}
-	return BuildTree(imageTreeSpec, trees, folded).Rows
+	k.cache = BuildTree(imageTreeSpec, trees, folded)
+	return k.cache.Rows
 }
 
-func (imageKind) FoldKey(data any, folded map[string]bool, index int) string {
-	trees := toSortedImages(data)
-	if trees == nil || index < 0 {
+func (k *imageKind) FoldKey(_ any, _ map[string]bool, index int) string {
+	if index < 0 || index >= len(k.cache.Nodes) {
 		return ""
 	}
-	result := BuildTree(imageTreeSpec, trees, folded)
-	if index >= len(result.Nodes) {
-		return ""
-	}
-	node := result.Nodes[index]
+	node := k.cache.Nodes[index]
 	if node.HasChildren {
 		return node.ID
 	}
 	return ""
 }
 
-func (imageKind) InitFolded(data any) map[string]bool {
+func (k *imageKind) InitFolded(data any) map[string]bool {
 	trees := toSortedImages(data)
 	if trees == nil {
 		return nil
@@ -103,26 +103,19 @@ func (imageKind) InitFolded(data any) map[string]bool {
 	return folded
 }
 
-func (imageKind) Detail(data any, folded map[string]bool, index int) (string, string) {
-	trees := toSortedImages(data)
-	if trees == nil || index < 0 {
+func (k *imageKind) Detail(_ any, _ map[string]bool, index int) (string, string) {
+	if index < 0 || index >= len(k.cache.Nodes) {
 		return "", ""
 	}
-	result := BuildTree(imageTreeSpec, trees, folded)
-	if index >= len(result.Nodes) {
-		return "", ""
-	}
-	return formatImageDetail(result.Nodes[index].Item)
+	return formatImageDetail(k.cache.Nodes[index].Item)
 }
 
-func (imageKind) CrossRefs(data any, folded map[string]bool) []string {
-	trees := toSortedImages(data)
-	if trees == nil {
+func (k *imageKind) CrossRefs(_ any, _ map[string]bool) []string {
+	if len(k.cache.Nodes) == 0 {
 		return nil
 	}
-	result := BuildTree(imageTreeSpec, trees, folded)
-	refs := make([]string, len(result.Nodes))
-	for i, node := range result.Nodes {
+	refs := make([]string, len(k.cache.Nodes))
+	for i, node := range k.cache.Nodes {
 		if node.HasChildren {
 			refs[i] = node.Item.SnapshotKey
 		}

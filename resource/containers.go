@@ -52,13 +52,15 @@ var containerTreeSpec = TreeSpec[ctr.ContainerInfo]{
 	},
 }
 
-type containerKind struct{}
+type containerKind struct {
+	cache BuildResult[ctr.ContainerInfo]
+}
 
-var ContainerKind Kind = containerKind{}
+var ContainerKind Kind = &containerKind{}
 
-func (containerKind) Name() string { return "Containers" }
+func (k *containerKind) Name() string { return "Containers" }
 
-func (containerKind) Columns() []Column {
+func (k *containerKind) Columns() []Column {
 	return []Column{
 		{Title: "ID", MinWidth: 12, Flex: true},
 		{Title: "TYPE", MinWidth: 8},
@@ -68,69 +70,57 @@ func (containerKind) Columns() []Column {
 	}
 }
 
-func (containerKind) Rows(data any, folded map[string]bool) []table.Row {
+// Rows rebuilds the tree cache. Must be called before FoldKey/Detail/CrossRefs.
+func (k *containerKind) Rows(data any, folded map[string]bool) []table.Row {
 	infos, ok := data.([]ctr.ContainerInfo)
 	if !ok || len(infos) == 0 {
+		k.cache = BuildResult[ctr.ContainerInfo]{} // Clear stale cache on empty data.
 		return nil
 	}
-	return BuildTree(containerTreeSpec, infos, folded).Rows
+	k.cache = BuildTree(containerTreeSpec, infos, folded)
+	return k.cache.Rows
 }
 
-func (containerKind) FoldKey(data any, folded map[string]bool, index int) string {
-	infos, ok := data.([]ctr.ContainerInfo)
-	if !ok || index < 0 {
+func (k *containerKind) FoldKey(_ any, _ map[string]bool, index int) string {
+	if index < 0 || index >= len(k.cache.Nodes) {
 		return ""
 	}
-	result := BuildTree(containerTreeSpec, infos, folded)
-	if index >= len(result.Nodes) {
-		return ""
-	}
-	node := result.Nodes[index]
+	node := k.cache.Nodes[index]
 	if node.HasChildren && node.Item.IsSandbox {
 		return node.ID
 	}
 	return ""
 }
 
-func (containerKind) InitFolded(_ any) map[string]bool {
+func (k *containerKind) InitFolded(_ any) map[string]bool {
 	return nil
 }
 
-func (containerKind) Detail(data any, folded map[string]bool, index int) (string, string) {
-	infos, ok := data.([]ctr.ContainerInfo)
-	if !ok || index < 0 {
+func (k *containerKind) Detail(_ any, _ map[string]bool, index int) (string, string) {
+	if index < 0 || index >= len(k.cache.Nodes) {
 		return "", ""
 	}
-	result := BuildTree(containerTreeSpec, infos, folded)
-	if index >= len(result.Nodes) {
-		return "", ""
-	}
-	return formatContainerDetail(result.Nodes[index].Item)
+	return formatContainerDetail(k.cache.Nodes[index].Item)
 }
 
-func (containerKind) CrossRefs(data any, folded map[string]bool) []string {
-	infos, ok := data.([]ctr.ContainerInfo)
-	if !ok {
+func (k *containerKind) CrossRefs(_ any, _ map[string]bool) []string {
+	if len(k.cache.Nodes) == 0 {
 		return nil
 	}
-	result := BuildTree(containerTreeSpec, infos, folded)
-	refs := make([]string, len(result.Nodes))
-	for i, node := range result.Nodes {
+	refs := make([]string, len(k.cache.Nodes))
+	for i, node := range k.cache.Nodes {
 		refs[i] = node.Item.Container.SnapshotKey
 	}
 	return refs
 }
 
-func ContainerSpec(data any, folded map[string]bool, index int) (string, string) {
-	infos, ok := data.([]ctr.ContainerInfo)
-	if !ok || index < 0 {
+// ContainerSpec returns the formatted runtime spec for the container at the given row index.
+func ContainerSpec(_ any, _ map[string]bool, index int) (string, string) {
+	ck := ContainerKind.(*containerKind)
+	if index < 0 || index >= len(ck.cache.Nodes) {
 		return "", ""
 	}
-	result := BuildTree(containerTreeSpec, infos, folded)
-	if index >= len(result.Nodes) {
-		return "", ""
-	}
-	item := result.Nodes[index].Item
+	item := ck.cache.Nodes[index].Item
 	if item.Spec == nil {
 		return "", ""
 	}

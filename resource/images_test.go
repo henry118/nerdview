@@ -410,6 +410,7 @@ func TestImagesDuplicateDigestAdjacent(t *testing.T) {
 func TestImageKindDetail(t *testing.T) {
 	data := testImageTrees()
 
+	ImageKind.Rows(data, nil)
 	title, body := ImageKind.Detail(data, nil, 0)
 	if title != "docker.io/library/nginx:latest" {
 		t.Errorf("Title = %q, want %q", title, "docker.io/library/nginx:latest")
@@ -434,6 +435,7 @@ func TestImageKindCrossRefs(t *testing.T) {
 			},
 		},
 	}
+	ImageKind.Rows(data, nil)
 	refs := ImageKind.CrossRefs(data, nil)
 
 	// Root has children + snapshot key -> non-empty ref; child has no children -> empty
@@ -473,6 +475,7 @@ func TestImageKindDetail_WithAnnotations(t *testing.T) {
 		},
 	}
 
+	ImageKind.Rows(data, nil)
 	_, body := ImageKind.Detail(data, nil, 0)
 	if !strings.Contains(body, "Platform:   linux/amd64/v8") {
 		t.Error("Should show platform with variant")
@@ -509,6 +512,7 @@ func TestImageKind_NilData(t *testing.T) {
 func TestImageKindDetail_LeafNode(t *testing.T) {
 	data := testImageTrees()
 	// Index 5 is alpine (no children, leaf node)
+	ImageKind.Rows(data, nil)
 	title, body := ImageKind.Detail(data, nil, 5)
 	if title != "docker.io/library/alpine:3.19" {
 		t.Errorf("Title = %q, want %q", title, "docker.io/library/alpine:3.19")

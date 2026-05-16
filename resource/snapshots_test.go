@@ -92,6 +92,7 @@ func TestSnapshotKindRowID(t *testing.T) {
 	folded := map[string]bool{}
 
 	// Index 0 is layer1 (root with children)
+	SnapshotKind.Rows(data, folded)
 	id := SnapshotKind.FoldKey(data, folded, 0)
 	if id != "layer1" {
 		t.Errorf("RowID index 0 = %q, want %q", id, "layer1")
@@ -137,6 +138,7 @@ func TestSnapshotNodeAtIndex(t *testing.T) {
 
 func TestSnapshotKindDetail(t *testing.T) {
 	data := testSnapshots()
+	SnapshotKind.Rows(data, nil)
 
 	title, body := SnapshotKind.Detail(data, nil, 0)
 	if title != "layer1" {
@@ -169,6 +171,7 @@ func TestSnapshotKindDetail_WithLabels(t *testing.T) {
 		},
 	}
 
+	SnapshotKind.Rows(data, nil)
 	_, body := SnapshotKind.Detail(data, nil, 0)
 	if !strings.Contains(body, "Labels:") {
 		t.Error("Should show labels section")
