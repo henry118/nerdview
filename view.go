@@ -69,6 +69,9 @@ func (m model) View() string {
 		}
 	}
 	var helpOpts []ui.HelpOption
+	if len(m.snapshotters) > 0 {
+		helpOpts = append(helpOpts, ui.WithSnapshotter())
+	}
 	if goToLabel != "" {
 		helpOpts = append(helpOpts, ui.WithGoTo(goToLabel))
 	}
@@ -134,19 +137,33 @@ func (m model) overlaySelector(title string, items []string, cursor int) string 
 	)
 }
 
+const statsNA = "--"
+
 // renderStatsBar renders the namespace and daemon stats line.
 func (m model) renderStatsBar() string {
-	ns := ui.StyleStatsLabel.Render(" ns:") + ui.StyleHeaderNS.Render(m.namespaces[m.activeNS])
-	s := m.daemonStats
-	if s.PID == 0 {
-		return ns
+	dot := ui.StyleConnected.Render(" ●")
+	if !m.connected {
+		dot = ui.StyleDisconnected.Render(" ●")
 	}
-	pid := ui.StyleStatsLabel.Render("  pid:") + ui.StyleStatsPID.Render(fmt.Sprintf("%d", s.PID))
-	cpu := ui.StyleStatsLabel.Render(" cpu:") + ui.StyleStatsCPU.Render(fmt.Sprintf("%.1f%%", s.CPUPct))
-	vms := ui.StyleStatsLabel.Render(" vms:") + ui.StyleStatsVMS.Render(resource.FormatBytes(s.VMS))
-	rss := ui.StyleStatsLabel.Render(" rss:") + ui.StyleStatsRSS.Render(resource.FormatBytes(s.RSS))
-	threads := ui.StyleStatsLabel.Render(" threads:") + ui.StyleStatsThreads.Render(fmt.Sprintf("%d", s.Threads))
-	up := ui.StyleStatsLabel.Render(" up:") + ui.StyleStatsUptime.Render(formatDuration(s.Uptime))
+	ns := dot + ui.StyleStatsLabel.Render(" ns:") + ui.StyleHeaderNS.Render(m.namespaces[m.activeNS])
+
+	s := m.daemonStats
+	pidVal, cpuVal, vmsVal, rssVal, threadsVal, upVal := statsNA, statsNA, statsNA, statsNA, statsNA, statsNA
+	if s.PID != 0 {
+		pidVal = fmt.Sprintf("%d", s.PID)
+		cpuVal = fmt.Sprintf("%.1f%%", s.CPUPct)
+		vmsVal = resource.FormatBytes(s.VMS)
+		rssVal = resource.FormatBytes(s.RSS)
+		threadsVal = fmt.Sprintf("%d", s.Threads)
+		upVal = formatDuration(s.Uptime)
+	}
+
+	pid := ui.StyleStatsLabel.Render("  pid:") + ui.StyleStatsPID.Render(pidVal)
+	cpu := ui.StyleStatsLabel.Render(" cpu:") + ui.StyleStatsCPU.Render(cpuVal)
+	vms := ui.StyleStatsLabel.Render(" vms:") + ui.StyleStatsVMS.Render(vmsVal)
+	rss := ui.StyleStatsLabel.Render(" rss:") + ui.StyleStatsRSS.Render(rssVal)
+	threads := ui.StyleStatsLabel.Render(" threads:") + ui.StyleStatsThreads.Render(threadsVal)
+	up := ui.StyleStatsLabel.Render(" up:") + ui.StyleStatsUptime.Render(upVal)
 	return ns + pid + cpu + vms + rss + threads + up
 }
 

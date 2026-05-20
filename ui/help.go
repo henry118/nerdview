@@ -24,10 +24,11 @@ import (
 type HelpOption func(*helpConfig)
 
 type helpConfig struct {
-	goToLabel string
-	showBack  bool
-	showSpec  bool
-	position  string
+	goToLabel       string
+	showBack        bool
+	showSpec        bool
+	showSnapshotter bool
+	position        string
 }
 
 // WithGoTo shows the "go to" hint with the given target label (e.g. "sn", "ctr").
@@ -43,6 +44,11 @@ func WithBack() HelpOption {
 // WithSpec shows the "spec" hint for viewing runtime specs.
 func WithSpec() HelpOption {
 	return func(c *helpConfig) { c.showSpec = true }
+}
+
+// WithSnapshotter shows the "snapshotter" selector hint.
+func WithSnapshotter() HelpOption {
+	return func(c *helpConfig) { c.showSnapshotter = true }
 }
 
 // WithPosition shows a right-aligned row position indicator (e.g. "3/47").
@@ -61,7 +67,9 @@ func HelpView(width int, opts ...HelpOption) string {
 		StyleHelpKey.Render("Tab") + StyleHelpBar.Render(":tab  "),
 		StyleHelpKey.Render("←/→") + StyleHelpBar.Render(":fold  "),
 		StyleHelpKey.Render("n") + StyleHelpBar.Render(":namespace  "),
-		StyleHelpKey.Render("s") + StyleHelpBar.Render(":snapshotter  "),
+	}
+	if cfg.showSnapshotter {
+		parts = append(parts, StyleHelpKey.Render("s")+StyleHelpBar.Render(":snapshotter  "))
 	}
 	if cfg.goToLabel != "" {
 		parts = append(parts, StyleHelpKey.Render("g")+StyleHelpBar.Render(":go to "+cfg.goToLabel+"  "))

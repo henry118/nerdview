@@ -51,10 +51,13 @@ func main() {
 	}
 	defer func() { _ = client.Close() }()
 
-	client.StartEventStream(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client.StartEventStream(ctx)
 	logging.Info("event stream started")
 
-	m := newModel(client, *namespace)
+	m := newModel(ctx, client, *namespace)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		logging.Error("program exited with error: %v", err)

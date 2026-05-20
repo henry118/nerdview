@@ -174,6 +174,15 @@ func (t *Tab) buildCrossRefs() {
 	}
 }
 
+// Clear resets the tab to an empty state.
+func (t *Tab) Clear() {
+	t.rawData = nil
+	t.cache = nil
+	t.crossRefs = nil
+	t.folded = make(map[string]bool)
+	t.Table.SetRows(nil)
+}
+
 // Unfold expands the current row if it is a folded node. Returns true if it unfolded.
 func (t *Tab) Unfold() bool {
 	if t.rawData == nil || t.kind.FoldKey == nil {

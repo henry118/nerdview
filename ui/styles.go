@@ -113,6 +113,16 @@ var (
 				Background(lipgloss.Color(ColorMauve)).
 				Padding(0, 1)
 
+	// StyleConnected is the green dot for connected state.
+	StyleConnected = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(ColorGreen)).
+			Background(lipgloss.Color(ColorBase))
+
+	// StyleDisconnected is the red dot for disconnected state.
+	StyleDisconnected = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorRed)).
+				Background(lipgloss.Color(ColorBase))
+
 	// StyleTableSelected is the selected row style for all tables.
 	StyleTableSelected = lipgloss.NewStyle().
 				Bold(true).

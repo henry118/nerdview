@@ -23,6 +23,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/errdefs"
 
 	"github.com/henry118/nerdview/ctr"
 	"github.com/henry118/nerdview/logging"
@@ -64,6 +65,8 @@ type navState struct {
 
 // model is the top-level bubbletea model for the TUI.
 type model struct {
+	// Context for cancelling background goroutines on exit.
+	ctx context.Context
 	// Containerd gRPC client.
 	client *ctr.Client
 	// Available namespaces.
@@ -88,8 +91,6 @@ type model struct {
 	mode viewMode
 	// Cursor for namespace selector.
 	nsCursor int
-	// Containerd daemon PID.
-	daemonPID int
 	// Latest daemon resource stats.
 	daemonStats ctr.DaemonStats
 	// Stack for cross-tab back navigation.
@@ -102,13 +103,25 @@ type model struct {
 	width int
 	// Terminal height.
 	height int
+	// Whether connected to containerd.
+	connected bool
 	// Last error to display in status bar.
 	err error
 }
 
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errdefs.IsUnavailable(err) ||
+		strings.Contains(err.Error(), "connection is closing") ||
+		strings.Contains(err.Error(), "transport is closing")
+}
+
 // newModel creates the initial model with default state.
-func newModel(client *ctr.Client, namespace string) model {
+func newModel(ctx context.Context, client *ctr.Client, namespace string) model {
 	return model{
+		ctx:         ctx,
 		client:      client,
 		namespaces:  []string{namespace},
 		snapshotter: "overlayfs",
@@ -127,11 +140,11 @@ func newModel(client *ctr.Client, namespace string) model {
 // Init starts background data loading, event subscription, and periodic refresh.
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
-		loadNamespaces(m.client),
-		loadSnapshotters(m.client),
-		loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter),
-		ctr.WaitForEvent(m.client),
-		initDaemonStats(m.client),
+		loadNamespaces(m.ctx, m.client),
+		loadSnapshotters(m.ctx, m.client),
+		loadResources(m.ctx, m.client, m.namespaces[m.activeNS], m.snapshotter),
+		ctr.WaitForEvent(m.ctx, m.client),
+		initDaemonStats(m.ctx, m.client),
 		tickCmd(),
 		statsTickCmd(),
 	)
@@ -173,6 +186,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case resourcesLoadedMsg:
 		if msg.namespace == m.namespaces[m.activeNS] {
+			m.connected = true
 			m.resources[tabImages].UpdateData(msg.images)
 			m.resources[tabSnapshots].UpdateData(msg.snapshots)
 			m.resources[tabContainers].UpdateData(msg.containers)
@@ -182,7 +196,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ctr.EventMsg:
 		var cmds []tea.Cmd
-		cmds = append(cmds, ctr.WaitForEvent(m.client))
+		cmds = append(cmds, ctr.WaitForEvent(m.ctx, m.client))
 		if msg.Namespace == m.namespaces[m.activeNS] {
 			switch {
 			case strings.HasPrefix(msg.Topic, "/images/"):
@@ -210,17 +224,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 
 	case ctr.EventErrMsg:
+		m.connected = false
 		m.err = msg.Err
 		return m, nil
 
+	case ctr.ReconnectedMsg:
+		m.connected = true
+		m.err = nil
+		logging.Info("reconnected to containerd")
+		return m, tea.Batch(
+			loadNamespaces(m.ctx, m.client),
+			loadSnapshotters(m.ctx, m.client),
+			loadResources(m.ctx, m.client, m.namespaces[m.activeNS], m.snapshotter),
+			ctr.WaitForEvent(m.ctx, m.client),
+		)
+
 	case daemonStatsMsg:
 		m.daemonStats = msg.stats
-		m.daemonPID = msg.stats.PID
 		return m, nil
 
 	case statsTickMsg:
 		return m, tea.Batch(
-			refreshDaemonStats(m.client, m.daemonPID),
+			refreshDaemonStats(m.ctx, m.client),
 			statsTickCmd(),
 		)
 
@@ -230,7 +255,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		var cmds []tea.Cmd
 		for tab := range m.dirtyTabs {
-			cmds = append(cmds, refreshSingleTab(m.client, tab, m.namespaces[m.activeNS], m.snapshotter))
+			cmds = append(cmds, refreshSingleTab(m.ctx, m.client, tab, m.namespaces[m.activeNS], m.snapshotter))
 		}
 		m.dirtyTabs = make(map[int]bool)
 		return m, tea.Batch(cmds...)
@@ -252,13 +277,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case errorMsg:
-		m.err = msg.err
+		if isConnectionError(msg.err) {
+			m.connected = false
+			m.err = nil
+			m.namespaces = []string{m.namespaces[m.activeNS]}
+			m.activeNS = 0
+			m.snapshotters = nil
+			m.daemonStats = ctr.DaemonStats{}
+			for _, tab := range m.resources {
+				tab.Clear()
+			}
+		} else {
+			m.err = msg.err
+		}
 		logging.Error("ui error: %v", msg.err)
 		return m, nil
 
 	case tickMsg:
 		return m, tea.Batch(
-			loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter),
+			loadResources(m.ctx, m.client, m.namespaces[m.activeNS], m.snapshotter),
 			tickCmd(),
 		)
 
@@ -317,7 +354,7 @@ func (m model) handleNSSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.events = nil
 		m.resources[tabEvents].UpdateData(m.events)
 		logging.Info("switched to namespace: %s", m.namespaces[m.activeNS])
-		return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
+		return m, loadResources(m.ctx, m.client, m.namespaces[m.activeNS], m.snapshotter)
 	}
 	return m, nil
 }
@@ -342,7 +379,7 @@ func (m model) handleSnapshotterSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.snapshotter = m.snapshotters[m.snCursor]
 		m.mode = modeNormal
 		logging.Info("switched to snapshotter: %s", m.snapshotter)
-		return m, loadResources(m.client, m.namespaces[m.activeNS], m.snapshotter)
+		return m, loadResources(m.ctx, m.client, m.namespaces[m.activeNS], m.snapshotter)
 	}
 	return m, nil
 }
@@ -458,9 +495,9 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // loadSnapshotters fetches available snapshotters from the daemon.
-func loadSnapshotters(client *ctr.Client) tea.Cmd {
+func loadSnapshotters(ctx context.Context, client *ctr.Client) tea.Cmd {
 	return func() tea.Msg {
-		sns, err := client.Snapshotters(context.Background())
+		sns, err := client.Snapshotters(ctx)
 		if err != nil {
 			return errorMsg{err: err}
 		}
@@ -469,9 +506,9 @@ func loadSnapshotters(client *ctr.Client) tea.Cmd {
 }
 
 // loadNamespaces fetches available namespaces from the daemon.
-func loadNamespaces(client *ctr.Client) tea.Cmd {
+func loadNamespaces(ctx context.Context, client *ctr.Client) tea.Cmd {
 	return func() tea.Msg {
-		ns, err := client.Namespaces(context.Background())
+		ns, err := client.Namespaces(ctx)
 		if err != nil {
 			return errorMsg{err: err}
 		}
@@ -480,9 +517,8 @@ func loadNamespaces(client *ctr.Client) tea.Cmd {
 }
 
 // loadResources fetches all resource data for the active namespace.
-func loadResources(client *ctr.Client, ns, snapshotter string) tea.Cmd {
+func loadResources(ctx context.Context, client *ctr.Client, ns, snapshotter string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
 		imgs, err := client.ImageTrees(ctx, ns, snapshotter)
 		if err != nil {
 			return errorMsg{err: err}
@@ -517,9 +553,8 @@ func debounceCmd(gen int) tea.Cmd {
 }
 
 // refreshSingleTab reloads one resource type by tab index.
-func refreshSingleTab(client *ctr.Client, tab int, ns, snapshotter string) tea.Cmd {
+func refreshSingleTab(ctx context.Context, client *ctr.Client, tab int, ns, snapshotter string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
 		switch tab {
 		case tabImages:
 			imgs, err := client.ImageTrees(ctx, ns, snapshotter)
@@ -565,9 +600,9 @@ func statsTickCmd() tea.Cmd {
 }
 
 // initDaemonStats fetches the initial daemon PID and stats.
-func initDaemonStats(client *ctr.Client) tea.Cmd {
+func initDaemonStats(ctx context.Context, client *ctr.Client) tea.Cmd {
 	return func() tea.Msg {
-		pid, err := client.DaemonPID()
+		pid, err := client.DaemonPID(ctx)
 		if err != nil {
 			return nil
 		}
@@ -580,14 +615,12 @@ func initDaemonStats(client *ctr.Client) tea.Cmd {
 }
 
 // refreshDaemonStats updates daemon resource usage metrics.
-func refreshDaemonStats(client *ctr.Client, pid int) tea.Cmd {
+// Always calls DaemonPID to validate the connection is alive.
+func refreshDaemonStats(ctx context.Context, client *ctr.Client) tea.Cmd {
 	return func() tea.Msg {
-		if pid == 0 {
-			var err error
-			pid, err = client.DaemonPID()
-			if err != nil {
-				return nil
-			}
+		pid, err := client.DaemonPID(ctx)
+		if err != nil {
+			return errorMsg{err: err}
 		}
 		stats, err := ctr.ReadDaemonStats(pid)
 		if err != nil {
