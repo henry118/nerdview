@@ -15,7 +15,7 @@
 package ctr
 
 import (
-	"fmt"
+	"context"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -39,28 +39,38 @@ type EventErrMsg struct {
 	Err error
 }
 
+// ReconnectedMsg is sent when the event stream successfully reconnects.
+type ReconnectedMsg struct{}
+
 // WaitForEvent returns a Bubble Tea command that blocks until the next
-// containerd event arrives, then delivers it as an EventMsg.
-func WaitForEvent(c *Client) tea.Cmd {
+// containerd event arrives. On stream failure, it attempts to reconnect
+// with exponential backoff until the context is cancelled.
+func WaitForEvent(ctx context.Context, c *Client) tea.Cmd {
 	return func() tea.Msg {
-		select {
-		case env, ok := <-c.EventCh():
-			if !ok {
-				logging.Error("event channel closed")
-				return EventErrMsg{Err: fmt.Errorf("event channel closed")}
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case env, ok := <-c.EventCh():
+				if !ok {
+					logging.Error("event channel closed, reconnecting...")
+					if err := c.reconnectAndSubscribe(ctx); err != nil {
+						return EventErrMsg{Err: err}
+					}
+					return ReconnectedMsg{}
+				}
+				logging.Debug("event received: ns=%s topic=%s", env.Namespace, env.Topic)
+				return eventFromEnvelope(env)
+			case err, ok := <-c.ErrCh():
+				if !ok || err != nil {
+					logging.Error("event stream error, reconnecting...")
+					if err := c.reconnectAndSubscribe(ctx); err != nil {
+						return EventErrMsg{Err: err}
+					}
+					return ReconnectedMsg{}
+				}
+				return nil
 			}
-			logging.Debug("event received: ns=%s topic=%s", env.Namespace, env.Topic)
-			return eventFromEnvelope(env)
-		case err, ok := <-c.ErrCh():
-			if !ok {
-				logging.Error("error channel closed")
-				return EventErrMsg{Err: fmt.Errorf("error channel closed")}
-			}
-			if err != nil {
-				logging.Error("event stream error: %v", err)
-				return EventErrMsg{Err: err}
-			}
-			return nil
 		}
 	}
 }

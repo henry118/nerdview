@@ -15,6 +15,8 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +33,7 @@ import (
 
 func testModel() model {
 	m := model{
+		ctx:        context.Background(),
 		namespaces: []string{"default", "k8s.io"},
 		activeNS:   0,
 		resources: []*resource.Tab{
@@ -568,5 +571,195 @@ func TestEventsClearedOnNamespaceSwitch(t *testing.T) {
 	}
 	if m.activeNS != 1 {
 		t.Errorf("activeNS = %d, want 1", m.activeNS)
+	}
+}
+
+func TestConnectionStatus_StartsDisconnected(t *testing.T) {
+	m := testModel()
+	if m.connected {
+		t.Error("model should start disconnected")
+	}
+}
+
+func TestConnectionStatus_ConnectedOnDataLoad(t *testing.T) {
+	m := testModel()
+
+	msg := resourcesLoadedMsg{
+		namespace: "default",
+		images:    nil,
+	}
+	newModel, _ := m.Update(msg)
+	m = newModel.(model)
+
+	if !m.connected {
+		t.Error("should be connected after resourcesLoadedMsg")
+	}
+}
+
+func TestConnectionStatus_DisconnectedOnEventErr(t *testing.T) {
+	m := testModel()
+	m.connected = true
+
+	msg := ctr.EventErrMsg{Err: fmt.Errorf("stream closed")}
+	newModel, _ := m.Update(msg)
+	m = newModel.(model)
+
+	if m.connected {
+		t.Error("should be disconnected after EventErrMsg")
+	}
+}
+
+func TestConnectionStatus_DisconnectedOnUnavailable(t *testing.T) {
+	m := testModel()
+	m.connected = true
+
+	msg := errorMsg{err: fmt.Errorf("some other error")}
+	newModel, _ := m.Update(msg)
+	m = newModel.(model)
+
+	if !m.connected {
+		t.Error("non-unavailable error should not disconnect")
+	}
+}
+
+func TestIsConnectionError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"generic error", fmt.Errorf("timeout"), false},
+		{"connection closing", fmt.Errorf("connection is closing"), true},
+		{"transport closing", fmt.Errorf("transport is closing"), true},
+		{"wrapped connection closing", fmt.Errorf("rpc: %s", "connection is closing"), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isConnectionError(tt.err); got != tt.want {
+				t.Errorf("isConnectionError(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDisconnect_ResetsState(t *testing.T) {
+	m := testModel()
+	m.connected = true
+	m.snapshotters = []string{"overlayfs", "native"}
+	m.daemonStats = ctr.DaemonStats{PID: 1234, CPUPct: 5.0, RSS: 1024, VMS: 2048, Threads: 10}
+
+	// Load data into tabs
+	m.resources[tabImages].UpdateData([]ctr.ImageTree{
+		{Name: "nginx:latest"},
+	})
+	m.resources[tabContainers].UpdateData([]ctr.ContainerInfo{
+		{Container: containers.Container{ID: "ctr1", Runtime: containers.RuntimeInfo{Name: "runc"}, CreatedAt: time.Now()}},
+	})
+	m.resources[tabTasks].UpdateData([]ctr.TaskInfo{
+		{ContainerID: "ctr1", Process: &tasktypes.Process{ID: "ctr1", Pid: 100, Status: tasktypes.Status_RUNNING}},
+	})
+
+	// Send connection error
+	msg := errorMsg{err: fmt.Errorf("transport is closing")}
+	newModel, _ := m.Update(msg)
+	m = newModel.(model)
+
+	if m.connected {
+		t.Error("should be disconnected")
+	}
+	if m.err != nil {
+		t.Error("err should be nil for connection errors")
+	}
+	if len(m.namespaces) != 1 {
+		t.Errorf("namespaces should be reduced to 1, got %d", len(m.namespaces))
+	}
+	if m.namespaces[0] != "default" {
+		t.Errorf("remaining namespace should be 'default', got %q", m.namespaces[0])
+	}
+	if m.activeNS != 0 {
+		t.Errorf("activeNS should be 0, got %d", m.activeNS)
+	}
+	if m.snapshotters != nil {
+		t.Errorf("snapshotters should be nil, got %v", m.snapshotters)
+	}
+	if m.daemonStats.PID != 0 {
+		t.Errorf("daemonStats.PID should be 0, got %d", m.daemonStats.PID)
+	}
+	for i, tab := range m.resources {
+		if len(tab.Table.Rows()) != 0 {
+			t.Errorf("tab %d should have 0 rows, got %d", i, len(tab.Table.Rows()))
+		}
+	}
+}
+
+func TestDisconnect_PreservesActiveNamespace(t *testing.T) {
+	m := testModel()
+	m.connected = true
+	m.namespaces = []string{"default", "k8s.io", "test"}
+	m.activeNS = 2
+
+	msg := errorMsg{err: fmt.Errorf("connection is closing")}
+	newModel, _ := m.Update(msg)
+	m = newModel.(model)
+
+	if len(m.namespaces) != 1 {
+		t.Fatalf("expected 1 namespace, got %d", len(m.namespaces))
+	}
+	if m.namespaces[0] != "test" {
+		t.Errorf("preserved namespace should be 'test', got %q", m.namespaces[0])
+	}
+	if m.activeNS != 0 {
+		t.Errorf("activeNS should be reset to 0, got %d", m.activeNS)
+	}
+}
+
+func TestDisconnect_NonConnectionError_KeepsState(t *testing.T) {
+	m := testModel()
+	m.connected = true
+	m.snapshotters = []string{"overlayfs"}
+	m.daemonStats = ctr.DaemonStats{PID: 999}
+	m.resources[tabContainers].UpdateData([]ctr.ContainerInfo{
+		{Container: containers.Container{ID: "ctr1", Runtime: containers.RuntimeInfo{Name: "runc"}, CreatedAt: time.Now()}},
+	})
+
+	msg := errorMsg{err: fmt.Errorf("permission denied")}
+	newModel, _ := m.Update(msg)
+	m = newModel.(model)
+
+	if !m.connected {
+		t.Error("should remain connected for non-connection errors")
+	}
+	if m.err == nil || m.err.Error() != "permission denied" {
+		t.Errorf("err should be 'permission denied', got %v", m.err)
+	}
+	if m.snapshotters == nil {
+		t.Error("snapshotters should not be cleared")
+	}
+	if m.daemonStats.PID != 999 {
+		t.Error("daemonStats should not be cleared")
+	}
+	if len(m.resources[tabContainers].Table.Rows()) == 0 {
+		t.Error("tab rows should not be cleared")
+	}
+}
+
+func TestReconnectedMsg_RestoresState(t *testing.T) {
+	m := testModel()
+	m.connected = false
+	m.err = fmt.Errorf("old error")
+
+	msg := ctr.ReconnectedMsg{}
+	newModel, cmd := m.Update(msg)
+	m = newModel.(model)
+
+	if !m.connected {
+		t.Error("should be connected after ReconnectedMsg")
+	}
+	if m.err != nil {
+		t.Errorf("err should be nil after reconnect, got %v", m.err)
+	}
+	if cmd == nil {
+		t.Error("should return commands to reload data after reconnect")
 	}
 }

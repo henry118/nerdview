@@ -48,8 +48,10 @@ var prevCPUSample struct {
 }
 
 // DaemonPID returns the containerd daemon's PID via the introspection API.
-func (c *Client) DaemonPID() (int, error) {
-	ctx := context.Background()
+// Uses a short timeout as this doubles as a connection health check.
+func (c *Client) DaemonPID(ctx context.Context) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
+	defer cancel()
 	resp, err := c.inner.IntrospectionService().Server(ctx)
 	if err != nil {
 		logging.Error("failed to get daemon PID via introspection: %v", err)

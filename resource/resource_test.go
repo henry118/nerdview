@@ -333,6 +333,71 @@ func TestTab_RevealRow(t *testing.T) {
 	}
 }
 
+func TestTab_Clear(t *testing.T) {
+	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
+		Rows: func(data any, folded map[string]bool) ([]table.Row, any) {
+			items := data.([]string)
+			var rows []table.Row
+			for _, item := range items {
+				if folded[item] {
+					rows = append(rows, table.Row{"▸ " + item})
+				} else {
+					rows = append(rows, table.Row{"▾ " + item})
+					rows = append(rows, table.Row{"  child-of-" + item})
+				}
+			}
+			return rows, mockCache{items: items, folded: folded}
+		},
+		FoldKey: func(cache any, index int) string {
+			mc := cache.(mockCache)
+			rowIdx := 0
+			for _, item := range mc.items {
+				if rowIdx == index {
+					return item
+				}
+				rowIdx++
+				if !mc.folded[item] {
+					rowIdx++
+				}
+			}
+			return ""
+		},
+		CrossRefs: func(cache any) []string {
+			mc := cache.(mockCache)
+			refs := make([]string, 0, len(mc.items))
+			for _, item := range mc.items {
+				refs = append(refs, "ref-"+item)
+			}
+			return refs
+		},
+	}
+
+	tab := NewTab(&kind, 80, 10)
+	tab.UpdateData([]string{"parent1", "parent2"})
+
+	if len(tab.Table.Rows()) == 0 {
+		t.Fatal("Expected rows before Clear")
+	}
+	if tab.CrossRef(0) == "" {
+		t.Fatal("Expected cross-refs before Clear")
+	}
+
+	tab.Clear()
+
+	if len(tab.Table.Rows()) != 0 {
+		t.Errorf("Expected 0 rows after Clear, got %d", len(tab.Table.Rows()))
+	}
+	if tab.CrossRef(0) != "" {
+		t.Errorf("Expected empty cross-ref after Clear, got %q", tab.CrossRef(0))
+	}
+
+	// UpdateData after Clear should work normally
+	tab.UpdateData([]string{"new1"})
+	if len(tab.Table.Rows()) != 2 {
+		t.Errorf("Expected 2 rows after re-populating, got %d", len(tab.Table.Rows()))
+	}
+}
+
 func TestTab_SetWidth(t *testing.T) {
 	kind := Kind{Name: "Test", Columns: []Column{{Title: "Name", MinWidth: 10, Flex: true}},
 		Rows: func(data any, _ map[string]bool) ([]table.Row, any) {

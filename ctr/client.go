@@ -20,6 +20,7 @@ import (
 	"context"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
@@ -50,11 +51,42 @@ type Client struct {
 
 // New connects to the containerd daemon at the given socket address.
 func New(address string) (*Client, error) {
-	c, err := containerd.New(address)
+	c, err := containerd.New(address, containerd.WithTimeout(connectTimeout))
 	if err != nil {
 		return nil, err
 	}
 	return &Client{inner: c, address: address}, nil
+}
+
+// Reconnect re-establishes the gRPC connection to the containerd daemon.
+func (c *Client) Reconnect() error {
+	return c.inner.Reconnect()
+}
+
+const (
+	// Timeout for connection attempts and health checks.
+	connectTimeout     = 2 * time.Second
+	reconnectBaseDelay = 1 * time.Second
+	reconnectMaxDelay  = 10 * time.Second
+)
+
+func (c *Client) reconnectAndSubscribe(ctx context.Context) error {
+	delay := reconnectBaseDelay
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(delay):
+		}
+		if err := c.inner.Reconnect(); err != nil {
+			delay = min(delay*2, reconnectMaxDelay)
+			logging.Debug("reconnect failed, retrying in %s: %v", delay, err)
+			continue
+		}
+		c.StartEventStream(ctx)
+		logging.Info("reconnected to containerd")
+		return nil
+	}
 }
 
 // StateDir returns the containerd state directory.
