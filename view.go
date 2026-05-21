@@ -95,10 +95,10 @@ func (m model) View() string {
 
 	// Overlay selectors
 	if m.mode == modeNSSelect {
-		content = m.overlaySelector("Select Namespace", m.namespaces, m.nsCursor)
+		content = m.overlaySelector("SELECT NAMESPACE", m.namespaces, m.nsCursor)
 	}
 	if m.mode == modeSnapshotterSelect {
-		content = m.overlaySelector("Select Snapshotter", m.snapshotters, m.snCursor)
+		content = m.overlaySelector("SELECT SNAPSHOTTER", m.snapshotters, m.snCursor)
 	}
 
 	// Overlay detail dialog
@@ -145,7 +145,7 @@ func (m model) renderStatsBar() string {
 	if !m.connected {
 		dot = ui.StyleDisconnected.Render(" ●")
 	}
-	ns := dot + ui.StyleStatsLabel.Render(" ns:") + ui.StyleHeaderNS.Render(m.namespaces[m.activeNS])
+	ns := ui.StyleStatsLabel.Render(" ns:") + ui.StyleHeaderNS.Render(m.namespaces[m.activeNS])
 
 	s := m.daemonStats
 	pidVal, cpuVal, vmsVal, rssVal, threadsVal, upVal := statsNA, statsNA, statsNA, statsNA, statsNA, statsNA
@@ -164,7 +164,7 @@ func (m model) renderStatsBar() string {
 	rss := ui.StyleStatsLabel.Render(" rss:") + ui.StyleStatsRSS.Render(rssVal)
 	threads := ui.StyleStatsLabel.Render(" threads:") + ui.StyleStatsThreads.Render(threadsVal)
 	up := ui.StyleStatsLabel.Render(" up:") + ui.StyleStatsUptime.Render(upVal)
-	return ns + pid + cpu + vms + rss + threads + up
+	return dot + ns + pid + cpu + vms + rss + threads + up
 }
 
 // formatDuration formats a duration into a compact "Xd Xh Xm" string.
