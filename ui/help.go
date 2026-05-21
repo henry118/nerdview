@@ -64,25 +64,25 @@ func HelpView(width int, opts ...HelpOption) string {
 	}
 
 	parts := []string{
-		StyleHelpKey.Render("Tab") + StyleHelpBar.Render(":tab  "),
-		StyleHelpKey.Render("←/→") + StyleHelpBar.Render(":fold  "),
-		StyleHelpKey.Render("n") + StyleHelpBar.Render(":namespace  "),
+		StyleHelpKey.Render("TAB") + StyleHelpBar.Render(":TAB  "),
+		StyleHelpKey.Render("←/→") + StyleHelpBar.Render(":FOLD  "),
+		StyleHelpKey.Render("N") + StyleHelpBar.Render(":NAMESPACE  "),
 	}
 	if cfg.showSnapshotter {
-		parts = append(parts, StyleHelpKey.Render("s")+StyleHelpBar.Render(":snapshotter  "))
+		parts = append(parts, StyleHelpKey.Render("S")+StyleHelpBar.Render(":SNAPSHOTTER  "))
 	}
 	if cfg.goToLabel != "" {
-		parts = append(parts, StyleHelpKey.Render("g")+StyleHelpBar.Render(":go to "+cfg.goToLabel+"  "))
+		parts = append(parts, StyleHelpKey.Render("G")+StyleHelpBar.Render(":GO TO "+strings.ToUpper(cfg.goToLabel)+"  "))
 	}
 	if cfg.showBack {
-		parts = append(parts, StyleHelpKey.Render("b")+StyleHelpBar.Render(":back  "))
+		parts = append(parts, StyleHelpKey.Render("B")+StyleHelpBar.Render(":BACK  "))
 	}
 	if cfg.showSpec {
-		parts = append(parts, StyleHelpKey.Render("p")+StyleHelpBar.Render(":spec  "))
+		parts = append(parts, StyleHelpKey.Render("P")+StyleHelpBar.Render(":SPEC  "))
 	}
 	parts = append(parts,
-		StyleHelpKey.Render("Enter")+StyleHelpBar.Render(":detail  "),
-		StyleHelpKey.Render("q/Esc")+StyleHelpBar.Render(":quit"),
+		StyleHelpKey.Render("ENTER")+StyleHelpBar.Render(":DETAIL  "),
+		StyleHelpKey.Render("Q/ESC")+StyleHelpBar.Render(":QUIT"),
 	)
 	text := strings.Join(parts, "")
 	textWidth := lipgloss.Width(text)

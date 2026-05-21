@@ -22,19 +22,19 @@ import (
 )
 
 func TestHelpView_ContainsKeys(t *testing.T) {
-	view := HelpView(100, WithGoTo("sn"), WithBack(), WithPosition("3/47"))
+	view := HelpView(100, WithGoTo("sn"), WithBack(), WithSnapshotter(), WithPosition("3/47"))
 
-	keys := []string{"←/→", "Tab", "n", "s", "Enter", "Esc"}
+	keys := []string{"←/→", "TAB", "N", "S", "ENTER", "ESC"}
 	for _, key := range keys {
 		if !strings.Contains(view, key) {
 			t.Errorf("HelpView should contain %q", key)
 		}
 	}
-	if !strings.Contains(view, "go to sn") {
-		t.Error("HelpView should contain 'go to sn' with WithGoTo('sn')")
+	if !strings.Contains(view, "GO TO SN") {
+		t.Error("HelpView should contain 'GO TO SN' with WithGoTo('sn')")
 	}
-	if !strings.Contains(view, "back") {
-		t.Error("HelpView should contain 'back' with WithBack()")
+	if !strings.Contains(view, "BACK") {
+		t.Error("HelpView should contain 'BACK' with WithBack()")
 	}
 	if !strings.Contains(view, "3/47") {
 		t.Error("HelpView should contain position indicator '3/47'")
@@ -43,18 +43,18 @@ func TestHelpView_ContainsKeys(t *testing.T) {
 
 func TestHelpView_GoToCtr(t *testing.T) {
 	view := HelpView(100, WithGoTo("ctr"))
-	if !strings.Contains(view, "go to ctr") {
-		t.Error("HelpView should contain 'go to ctr' with WithGoTo('ctr')")
+	if !strings.Contains(view, "GO TO CTR") {
+		t.Error("HelpView should contain 'GO TO CTR' with WithGoTo('ctr')")
 	}
-	if strings.Contains(view, "back") {
-		t.Error("HelpView should not contain 'back' without WithBack()")
+	if strings.Contains(view, "BACK") {
+		t.Error("HelpView should not contain 'BACK' without WithBack()")
 	}
 }
 
 func TestHelpView_ShowSpec(t *testing.T) {
 	view := HelpView(100, WithSpec())
-	if !strings.Contains(view, "spec") {
-		t.Error("HelpView should contain 'spec' with WithSpec()")
+	if !strings.Contains(view, "SPEC") {
+		t.Error("HelpView should contain 'SPEC' with WithSpec()")
 	}
 }
 

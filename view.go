@@ -95,10 +95,10 @@ func (m model) View() string {
 
 	// Overlay selectors
 	if m.mode == modeNSSelect {
-		content = m.overlaySelector("Select Namespace", m.namespaces, m.nsCursor)
+		content = m.overlaySelector("SELECT NAMESPACE", m.namespaces, m.nsCursor)
 	}
 	if m.mode == modeSnapshotterSelect {
-		content = m.overlaySelector("Select Snapshotter", m.snapshotters, m.snCursor)
+		content = m.overlaySelector("SELECT SNAPSHOTTER", m.snapshotters, m.snCursor)
 	}
 
 	// Overlay detail dialog
