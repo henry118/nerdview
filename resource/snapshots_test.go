@@ -94,12 +94,12 @@ func TestSnapshotKindFoldKey(t *testing.T) {
 	_, cache := SnapshotKind.Rows(data, folded)
 	id := SnapshotKind.FoldKey(cache, 0)
 	if id != "layer1" {
-		t.Errorf("RowID index 0 = %q, want %q", id, "layer1")
+		t.Errorf("FoldKey index 0 = %q, want %q", id, "layer1")
 	}
 
 	id = SnapshotKind.FoldKey(cache, 1)
 	if id != "" {
-		t.Errorf("RowID index 1 (non-root) = %q, want empty", id)
+		t.Errorf("FoldKey index 1 (non-root) = %q, want empty", id)
 	}
 }
 

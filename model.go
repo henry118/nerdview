@@ -533,7 +533,7 @@ func loadResources(ctx context.Context, client *ctr.Client, ns, snapshotter stri
 		}
 		snaps, err := client.Snapshots(ctx, ns, snapshotter)
 		if err != nil {
-			snaps = nil
+			return errorMsg{err: err}
 		}
 		return resourcesLoadedMsg{
 			namespace:  ns,

@@ -17,6 +17,7 @@ package resource
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -135,8 +136,13 @@ func formatContainerDetail(info ctr.ContainerInfo) (string, string) {
 	}
 	if len(c.Labels) > 0 {
 		fmt.Fprintf(&b, "Labels:\n")
-		for k, v := range c.Labels {
-			fmt.Fprintf(&b, "  %s: %s\n", k, v)
+		keys := make([]string, 0, len(c.Labels))
+		for k := range c.Labels {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(&b, "  %s: %s\n", k, c.Labels[k])
 		}
 	}
 	return c.ID, b.String()

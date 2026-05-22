@@ -27,9 +27,9 @@ func TestNewRuntimeHelper_Runc(t *testing.T) {
 		"io.containerd.runc",
 	}
 	for _, name := range tests {
-		helper := NewRuntimeHelper(name, nil)
+		helper := newRuntimeHelper(name, nil)
 		if _, ok := helper.(*runcHelper); !ok {
-			t.Errorf("NewRuntimeHelper(%q) = %T, want *runcHelper", name, helper)
+			t.Errorf("newRuntimeHelper(%q) = %T, want *runcHelper", name, helper)
 		}
 	}
 }
@@ -42,9 +42,9 @@ func TestNewRuntimeHelper_Fallback(t *testing.T) {
 		"",
 	}
 	for _, name := range tests {
-		helper := NewRuntimeHelper(name, nil)
+		helper := newRuntimeHelper(name, nil)
 		if _, ok := helper.(*fallbackHelper); !ok {
-			t.Errorf("NewRuntimeHelper(%q) = %T, want *fallbackHelper", name, helper)
+			t.Errorf("newRuntimeHelper(%q) = %T, want *fallbackHelper", name, helper)
 		}
 	}
 }
@@ -60,7 +60,7 @@ func TestFallbackHelper_ReturnsEmpty(t *testing.T) {
 	}
 	detail := h.Inspect(1234)
 	if detail.Cmdline != "" || detail.StartedAt != "" || detail.Root != "" || detail.Cwd != "" {
-		t.Errorf("fallback Inspect() should return empty ProcessDetail, got %+v", detail)
+		t.Errorf("fallback Inspect() should return empty processDetail, got %+v", detail)
 	}
 	if detail.Cgroups != nil || detail.Namespaces != nil {
 		t.Errorf("fallback Inspect() slices/maps should be nil, got cgroups=%v ns=%v", detail.Cgroups, detail.Namespaces)

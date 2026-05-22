@@ -21,15 +21,15 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 )
 
-// ProcessEntry describes a single process (init or exec) within a container task.
-type ProcessEntry struct {
+// processEntry describes a single process (init or exec) within a container task.
+type processEntry struct {
 	ID     string
 	Pid    uint32
 	IsExec bool
 }
 
-// ProcessDetail holds runtime-derived metadata for a task process.
-type ProcessDetail struct {
+// processDetail holds runtime-derived metadata for a task process.
+type processDetail struct {
 	Cmdline    string
 	StartedAt  string
 	Root       string
@@ -38,14 +38,14 @@ type ProcessDetail struct {
 	Namespaces map[string]string
 }
 
-// RuntimeHelper abstracts runtime-specific task inspection. Each container
+// runtimeHelper abstracts runtime-specific task inspection. Each container
 // runtime (runc, kata, etc.) may store process state differently. For runc,
 // process info is available via host /proc; for VM-based runtimes the host
 // PID is a shim and workload details require runtime-specific retrieval.
-type RuntimeHelper interface {
+type runtimeHelper interface {
 	// Processes returns all exec processes for the given container by
 	// querying the containerd task service. Init processes are excluded.
-	Processes(ctx context.Context, containerID string) []ProcessEntry
+	Processes(ctx context.Context, containerID string) []processEntry
 
 	// BundlePath returns the on-disk OCI bundle path for a container task,
 	// or "" if the path cannot be determined for this runtime.
@@ -53,11 +53,11 @@ type RuntimeHelper interface {
 
 	// Inspect returns detailed process metadata (cmdline, root, cwd,
 	// cgroups, namespaces, start time) for the given host PID.
-	Inspect(pid uint32) ProcessDetail
+	Inspect(pid uint32) processDetail
 }
 
-// NewRuntimeHelper returns the appropriate RuntimeHelper for the given runtime name.
-func NewRuntimeHelper(runtimeName string, taskService tasks.TasksClient) RuntimeHelper {
+// newRuntimeHelper returns the appropriate runtimeHelper for the given runtime name.
+func newRuntimeHelper(runtimeName string, taskService tasks.TasksClient) runtimeHelper {
 	for prefix, factory := range runtimeFactories {
 		if strings.HasPrefix(runtimeName, prefix) {
 			return factory(taskService)
@@ -68,8 +68,8 @@ func NewRuntimeHelper(runtimeName string, taskService tasks.TasksClient) Runtime
 
 // runtimeFactories maps runtime name prefixes to their helper constructors.
 // Prefix matching handles versioned names (e.g. "io.containerd.runc.v2").
-var runtimeFactories = map[string]func(tasks.TasksClient) RuntimeHelper{
-	"io.containerd.runc": func(ts tasks.TasksClient) RuntimeHelper {
+var runtimeFactories = map[string]func(tasks.TasksClient) runtimeHelper{
+	"io.containerd.runc": func(ts tasks.TasksClient) runtimeHelper {
 		return &runcHelper{taskService: ts}
 	},
 }
@@ -78,7 +78,7 @@ var runtimeFactories = map[string]func(tasks.TasksClient) RuntimeHelper{
 // allowing the UI to gracefully display only containerd API-provided fields.
 type fallbackHelper struct{}
 
-func (f *fallbackHelper) Processes(_ context.Context, _ string) []ProcessEntry {
+func (f *fallbackHelper) Processes(_ context.Context, _ string) []processEntry {
 	return nil
 }
 
@@ -86,6 +86,6 @@ func (f *fallbackHelper) BundlePath(_, _, _ string) string {
 	return ""
 }
 
-func (f *fallbackHelper) Inspect(_ uint32) ProcessDetail {
-	return ProcessDetail{}
+func (f *fallbackHelper) Inspect(_ uint32) processDetail {
+	return processDetail{}
 }

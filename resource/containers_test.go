@@ -148,12 +148,12 @@ func TestContainerKindFoldKey(t *testing.T) {
 
 	id := ContainerKind.FoldKey(cache, 0)
 	if id != "sandbox-abc" {
-		t.Errorf("RowID index 0 = %q, want %q", id, "sandbox-abc")
+		t.Errorf("FoldKey index 0 = %q, want %q", id, "sandbox-abc")
 	}
 
 	id = ContainerKind.FoldKey(cache, 3)
 	if id != "" {
-		t.Errorf("RowID index 3 (standalone) = %q, want empty", id)
+		t.Errorf("FoldKey index 3 (standalone) = %q, want empty", id)
 	}
 }
 
