@@ -16,12 +16,48 @@ package resource
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/henry118/nerdview/ctr"
 )
+
+var taskTreeSpec = TreeSpec[ctr.TaskInfo]{
+	ID: func(t ctr.TaskInfo) string {
+		return taskID(t)
+	},
+	ParentID: func(t ctr.TaskInfo) string {
+		if t.ExecID != "" {
+			return t.ContainerID
+		}
+		return ""
+	},
+	Foldable: func(t ctr.TaskInfo, hasChildren bool) bool {
+		return t.ExecID == "" && hasChildren
+	},
+	Sort: func(a, b ctr.TaskInfo) bool {
+		return taskID(a) < taskID(b)
+	},
+	Row: func(t ctr.TaskInfo, _ bool) table.Row {
+		id := t.ContainerID
+		typ := "init"
+		if t.ExecID != "" {
+			id = t.ExecID
+			typ = "exec"
+		}
+		return table.Row{
+			id,
+			t.ContainerID,
+			typ,
+			fmt.Sprintf("%d", t.Process.Pid),
+			t.Process.Status.String(),
+			t.Cmdline,
+			t.StartedAt,
+		}
+	},
+}
 
 var TaskKind = Kind{
 	Name: "Tasks",
@@ -34,46 +70,49 @@ var TaskKind = Kind{
 		{Title: "CMDLINE", MinWidth: 10, Flex: true},
 		{Title: "STARTED", MinWidth: 19, Flex: true},
 	},
-	Rows: func(data any, _ map[string]bool) ([]table.Row, any) {
+	Rows: func(data any, folded map[string]bool) ([]table.Row, any) {
 		tasks, ok := data.([]ctr.TaskInfo)
 		if !ok || len(tasks) == 0 {
 			return nil, nil
 		}
-		rows := make([]table.Row, len(tasks))
-		for i, t := range tasks {
-			id := t.ContainerID
-			typ := "init"
-			if t.ExecID != "" {
-				id = t.ExecID
-				typ = "exec"
-			}
-			rows[i] = table.Row{
-				id,
-				t.ContainerID,
-				typ,
-				fmt.Sprintf("%d", t.Process.Pid),
-				t.Process.Status.String(),
-				t.Cmdline,
-				t.StartedAt,
-			}
-		}
-		return rows, tasks
+		result := BuildTree(taskTreeSpec, tasks, folded)
+		return result.Rows, result
 	},
-	Detail: func(cache any, index int) (string, string) {
-		tasks, ok := cache.([]ctr.TaskInfo)
-		if !ok || index < 0 || index >= len(tasks) {
-			return "", ""
+	FoldKey: func(cache any, index int) string {
+		result, ok := cache.(BuildResult[ctr.TaskInfo])
+		if !ok || index < 0 || index >= len(result.Nodes) {
+			return ""
 		}
-		return formatTaskDetail(tasks[index])
+		node := result.Nodes[index]
+		if node.HasChildren && node.Item.ExecID == "" {
+			return node.ID
+		}
+		return ""
 	},
-	CrossRefs: func(cache any) []string {
-		tasks, ok := cache.([]ctr.TaskInfo)
-		if !ok {
+	InitFolded: func(data any) map[string]bool {
+		tasks, ok := data.([]ctr.TaskInfo)
+		if !ok || len(tasks) == 0 {
 			return nil
 		}
-		refs := make([]string, len(tasks))
-		for i, t := range tasks {
-			refs[i] = t.ContainerID
+		folded := make(map[string]bool)
+		DefaultFoldState(taskTreeSpec, tasks, folded)
+		return folded
+	},
+	Detail: func(cache any, index int) (string, string) {
+		result, ok := cache.(BuildResult[ctr.TaskInfo])
+		if !ok || index < 0 || index >= len(result.Nodes) {
+			return "", ""
+		}
+		return formatTaskDetail(result.Nodes[index].Item)
+	},
+	CrossRefs: func(cache any) []string {
+		result, ok := cache.(BuildResult[ctr.TaskInfo])
+		if !ok || len(result.Nodes) == 0 {
+			return nil
+		}
+		refs := make([]string, len(result.Nodes))
+		for i, node := range result.Nodes {
+			refs[i] = node.Item.ContainerID
 		}
 		return refs
 	},
@@ -124,13 +163,16 @@ func formatTaskDetail(t ctr.TaskInfo) (string, string) {
 		}
 	}
 	if len(t.Namespaces) > 0 {
-		first := true
-		for _, target := range t.Namespaces {
-			if first {
-				fmt.Fprintf(&b, "Namespaces:   %s\n", target)
-				first = false
+		keys := make([]string, 0, len(t.Namespaces))
+		for k := range t.Namespaces {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for i, k := range keys {
+			if i == 0 {
+				fmt.Fprintf(&b, "Namespaces:   %s\n", t.Namespaces[k])
 			} else {
-				fmt.Fprintf(&b, "              %s\n", target)
+				fmt.Fprintf(&b, "              %s\n", t.Namespaces[k])
 			}
 		}
 	}

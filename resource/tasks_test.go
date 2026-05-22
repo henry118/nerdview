@@ -35,7 +35,7 @@ func TestTaskKindRows(t *testing.T) {
 			StartedAt: "2025-01-01 10:00:00",
 		},
 		{
-			ContainerID: "container-2",
+			ContainerID: "container-1",
 			Process: &tasktypes.Process{
 				ID:     "exec-shell",
 				Pid:    5678,
@@ -50,9 +50,9 @@ func TestTaskKindRows(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("Expected 2 rows, got %d", len(rows))
 	}
-	// Init task: ID = container ID, Type = init
-	if rows[0][0] != "container-1" {
-		t.Errorf("Row 0 ID = %q, want %q", rows[0][0], "container-1")
+	// Init task: tree prefix + container ID
+	if rows[0][0] != IconUnfolded+"container-1" {
+		t.Errorf("Row 0 ID = %q, want %q", rows[0][0], IconUnfolded+"container-1")
 	}
 	if rows[0][1] != "container-1" {
 		t.Errorf("Row 0 Container = %q, want %q", rows[0][1], "container-1")
@@ -69,15 +69,69 @@ func TestTaskKindRows(t *testing.T) {
 	if rows[0][6] != "2025-01-01 10:00:00" {
 		t.Errorf("Row 0 Started = %q, want %q", rows[0][6], "2025-01-01 10:00:00")
 	}
-	// Exec task: ID = exec ID, Container = container ID, Type = exec
-	if rows[1][0] != "exec-shell" {
-		t.Errorf("Row 1 ID = %q, want %q", rows[1][0], "exec-shell")
+	// Exec task: tree connector + exec ID
+	if rows[1][0] != ConnLast+"exec-shell" {
+		t.Errorf("Row 1 ID = %q, want %q", rows[1][0], ConnLast+"exec-shell")
 	}
-	if rows[1][1] != "container-2" {
-		t.Errorf("Row 1 Container = %q, want %q", rows[1][1], "container-2")
+	if rows[1][1] != "container-1" {
+		t.Errorf("Row 1 Container = %q, want %q", rows[1][1], "container-1")
 	}
 	if rows[1][2] != "exec" {
 		t.Errorf("Row 1 Type = %q, want %q", rows[1][2], "exec")
+	}
+}
+
+func TestTaskKindRows_Folded(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{
+			ContainerID: "container-1",
+			Process: &tasktypes.Process{
+				ID:     "container-1",
+				Pid:    1234,
+				Status: tasktypes.Status_RUNNING,
+			},
+		},
+		{
+			ContainerID: "container-1",
+			Process: &tasktypes.Process{
+				ID:     "exec-1",
+				Pid:    5678,
+				Status: tasktypes.Status_RUNNING,
+			},
+			ExecID: "exec-1",
+		},
+	}
+
+	folded := map[string]bool{"container-1": true}
+	rows, _ := TaskKind.Rows(data, folded)
+
+	if len(rows) != 1 {
+		t.Fatalf("Expected 1 row when folded, got %d", len(rows))
+	}
+	if rows[0][0] != IconFolded+"container-1" {
+		t.Errorf("Row 0 ID = %q, want %q", rows[0][0], IconFolded+"container-1")
+	}
+}
+
+func TestTaskKindRows_NoChildren(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{
+			ContainerID: "standalone",
+			Process: &tasktypes.Process{
+				ID:     "standalone",
+				Pid:    100,
+				Status: tasktypes.Status_RUNNING,
+			},
+		},
+	}
+
+	rows, _ := TaskKind.Rows(data, nil)
+
+	if len(rows) != 1 {
+		t.Fatalf("Expected 1 row, got %d", len(rows))
+	}
+	if rows[0][0] != IconBlank+"standalone" {
+		t.Errorf("Row 0 ID = %q, want %q", rows[0][0], IconBlank+"standalone")
 	}
 }
 
@@ -120,6 +174,14 @@ func TestTaskKindDetail_Exec(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{
 			ContainerID: "my-container",
+			Process: &tasktypes.Process{
+				ID:     "my-container",
+				Pid:    1000,
+				Status: tasktypes.Status_RUNNING,
+			},
+		},
+		{
+			ContainerID: "my-container",
 			ExecID:      "my-exec",
 			Process: &tasktypes.Process{
 				ID:     "my-exec",
@@ -130,7 +192,7 @@ func TestTaskKindDetail_Exec(t *testing.T) {
 	}
 
 	_, cache := TaskKind.Rows(data, nil)
-	title, body := TaskKind.Detail(cache, 0)
+	title, body := TaskKind.Detail(cache, 1)
 
 	if title != "my-exec" {
 		t.Errorf("Title = %q, want %q", title, "my-exec")
@@ -181,7 +243,7 @@ func TestTaskKindNameAndColumns(t *testing.T) {
 func TestTaskKindCrossRefs(t *testing.T) {
 	data := []ctr.TaskInfo{
 		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
-		{ContainerID: "ctr-2", Process: &tasktypes.Process{ID: "exec-1", Pid: 2}, ExecID: "exec-1"},
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "exec-1", Pid: 2}, ExecID: "exec-1"},
 	}
 	_, cache := TaskKind.Rows(data, nil)
 	refs := TaskKind.CrossRefs(cache)
@@ -191,8 +253,8 @@ func TestTaskKindCrossRefs(t *testing.T) {
 	if refs[0] != "ctr-1" {
 		t.Errorf("CrossRef[0] = %q, want %q", refs[0], "ctr-1")
 	}
-	if refs[1] != "ctr-2" {
-		t.Errorf("CrossRef[1] = %q, want %q", refs[1], "ctr-2")
+	if refs[1] != "ctr-1" {
+		t.Errorf("CrossRef[1] = %q, want %q", refs[1], "ctr-1")
 	}
 }
 
@@ -210,11 +272,42 @@ func TestTaskKind_NilData(t *testing.T) {
 }
 
 func TestTaskKindFoldKeyAndInitFolded(t *testing.T) {
-	if TaskKind.FoldKey != nil {
-		t.Error("Tasks FoldKey should be nil")
+	if TaskKind.FoldKey == nil {
+		t.Fatal("Tasks FoldKey should not be nil")
 	}
-	if TaskKind.InitFolded != nil {
-		t.Error("Tasks InitFolded should be nil")
+	if TaskKind.InitFolded == nil {
+		t.Fatal("Tasks InitFolded should not be nil")
+	}
+
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "exec-1", Pid: 2}, ExecID: "exec-1"},
+		{ContainerID: "ctr-2", Process: &tasktypes.Process{ID: "ctr-2", Pid: 3}},
+	}
+
+	folded := TaskKind.InitFolded(data)
+	if !folded["ctr-1"] {
+		t.Error("ctr-1 should be folded by default (has exec children)")
+	}
+	if folded["ctr-2"] {
+		t.Error("ctr-2 should not be folded (no children)")
+	}
+
+	_, cache := TaskKind.Rows(data, nil)
+	key := TaskKind.FoldKey(cache, 0)
+	if key != "ctr-1" {
+		t.Errorf("FoldKey(0) = %q, want %q", key, "ctr-1")
+	}
+	// ctr-2 is at index 2 (after ctr-1's child exec-1)
+	key = TaskKind.FoldKey(cache, 2)
+	if key != "" {
+		t.Errorf("FoldKey(2) = %q, want empty (no children)", key)
+	}
+}
+
+func TestTaskKindInitFolded_NilData(t *testing.T) {
+	if folded := TaskKind.InitFolded(nil); folded != nil {
+		t.Error("InitFolded(nil) should be nil")
 	}
 }
 
@@ -244,7 +337,8 @@ func TestTaskKindDetail_WithProcessInfo(t *testing.T) {
 		"Root:         /",
 		"Cwd:          /var/www",
 		"Cgroup:       0::/system.slice/containerd.service",
-		"Namespaces:",
+		"Namespaces:   mnt:[4026531840]",
+		"              pid:[4026531836]",
 		"Cmdline:      /usr/bin/nginx -g daemon off;",
 		"Started:      2025-06-01 08:00:00",
 		"Bundle:       /run/containerd/io.containerd.runtime.v2.task/default/full-info-ctr",
@@ -291,5 +385,140 @@ func TestTaskKindDetail_EmptyProcessInfo(t *testing.T) {
 	}
 	if strings.Contains(body, "Started:") {
 		t.Error("Empty StartedAt should be omitted")
+	}
+}
+
+func TestTaskKindTree_MultipleParents(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-b", Process: &tasktypes.Process{ID: "ctr-b", Pid: 10, Status: tasktypes.Status_RUNNING}},
+		{ContainerID: "ctr-a", Process: &tasktypes.Process{ID: "ctr-a", Pid: 1, Status: tasktypes.Status_RUNNING}},
+		{ContainerID: "ctr-a", Process: &tasktypes.Process{ID: "exec-a1", Pid: 2, Status: tasktypes.Status_RUNNING}, ExecID: "exec-a1"},
+		{ContainerID: "ctr-b", Process: &tasktypes.Process{ID: "exec-b1", Pid: 11, Status: tasktypes.Status_RUNNING}, ExecID: "exec-b1"},
+	}
+
+	rows, _ := TaskKind.Rows(data, nil)
+	if len(rows) != 4 {
+		t.Fatalf("Expected 4 rows, got %d", len(rows))
+	}
+	// Sorted: ctr-a first, then ctr-b
+	if rows[0][0] != IconUnfolded+"ctr-a" {
+		t.Errorf("Row 0 = %q, want %q", rows[0][0], IconUnfolded+"ctr-a")
+	}
+	if rows[1][0] != ConnLast+"exec-a1" {
+		t.Errorf("Row 1 = %q, want %q", rows[1][0], ConnLast+"exec-a1")
+	}
+	if rows[2][0] != IconUnfolded+"ctr-b" {
+		t.Errorf("Row 2 = %q, want %q", rows[2][0], IconUnfolded+"ctr-b")
+	}
+	if rows[3][0] != ConnLast+"exec-b1" {
+		t.Errorf("Row 3 = %q, want %q", rows[3][0], ConnLast+"exec-b1")
+	}
+}
+
+func TestTaskKindTree_OrphanedExec(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "missing-parent", Process: &tasktypes.Process{ID: "orphan-exec", Pid: 99, Status: tasktypes.Status_RUNNING}, ExecID: "orphan-exec"},
+	}
+
+	rows, _ := TaskKind.Rows(data, nil)
+	// Orphaned exec (parent not in data) is not rendered — in practice
+	// an exec cannot exist without its init task
+	if len(rows) != 0 {
+		t.Fatalf("Expected 0 rows for orphaned exec, got %d", len(rows))
+	}
+}
+
+func TestTaskKindFoldKey_OutOfBounds(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
+	}
+	_, cache := TaskKind.Rows(data, nil)
+
+	if key := TaskKind.FoldKey(cache, -1); key != "" {
+		t.Errorf("FoldKey(-1) = %q, want empty", key)
+	}
+	if key := TaskKind.FoldKey(cache, 100); key != "" {
+		t.Errorf("FoldKey(100) = %q, want empty", key)
+	}
+}
+
+func TestTaskKindFoldKey_ExecNotFoldable(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "exec-1", Pid: 2}, ExecID: "exec-1"},
+	}
+	_, cache := TaskKind.Rows(data, nil)
+
+	// Index 1 is the exec child — should not be foldable
+	if key := TaskKind.FoldKey(cache, 1); key != "" {
+		t.Errorf("FoldKey for exec = %q, want empty", key)
+	}
+}
+
+func TestTaskKindCrossRefs_Folded(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "ctr-1", Pid: 1}},
+		{ContainerID: "ctr-1", Process: &tasktypes.Process{ID: "exec-1", Pid: 2}, ExecID: "exec-1"},
+	}
+
+	folded := map[string]bool{"ctr-1": true}
+	_, cache := TaskKind.Rows(data, folded)
+	refs := TaskKind.CrossRefs(cache)
+
+	// When folded, only the init row is visible
+	if len(refs) != 1 {
+		t.Fatalf("Expected 1 ref when folded, got %d", len(refs))
+	}
+	if refs[0] != "ctr-1" {
+		t.Errorf("CrossRef[0] = %q, want %q", refs[0], "ctr-1")
+	}
+}
+
+func TestTaskKindRows_EmptySlice(t *testing.T) {
+	rows, cache := TaskKind.Rows([]ctr.TaskInfo{}, nil)
+	if rows != nil {
+		t.Error("Rows(empty) should be nil")
+	}
+	if cache != nil {
+		t.Error("Cache(empty) should be nil")
+	}
+}
+
+func TestTaskKindInitFolded_EmptySlice(t *testing.T) {
+	if folded := TaskKind.InitFolded([]ctr.TaskInfo{}); folded != nil {
+		t.Error("InitFolded(empty) should be nil")
+	}
+}
+
+func TestTaskKindTree_FoldUnfold(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{ContainerID: "ctr-a", Process: &tasktypes.Process{ID: "ctr-a", Pid: 1, Status: tasktypes.Status_RUNNING}},
+		{ContainerID: "ctr-a", Process: &tasktypes.Process{ID: "exec-1", Pid: 2, Status: tasktypes.Status_RUNNING}, ExecID: "exec-1"},
+		{ContainerID: "ctr-a", Process: &tasktypes.Process{ID: "exec-2", Pid: 3, Status: tasktypes.Status_RUNNING}, ExecID: "exec-2"},
+	}
+
+	// Unfolded: should show all 3 rows
+	rows, _ := TaskKind.Rows(data, nil)
+	if len(rows) != 3 {
+		t.Fatalf("Unfolded: expected 3 rows, got %d", len(rows))
+	}
+	if rows[0][0] != IconUnfolded+"ctr-a" {
+		t.Errorf("Unfolded root = %q, want %q", rows[0][0], IconUnfolded+"ctr-a")
+	}
+	if rows[1][0] != ConnMid+"exec-1" {
+		t.Errorf("First child = %q, want %q", rows[1][0], ConnMid+"exec-1")
+	}
+	if rows[2][0] != ConnLast+"exec-2" {
+		t.Errorf("Last child = %q, want %q", rows[2][0], ConnLast+"exec-2")
+	}
+
+	// Folded: should show only init task
+	folded := map[string]bool{"ctr-a": true}
+	rows, _ = TaskKind.Rows(data, folded)
+	if len(rows) != 1 {
+		t.Fatalf("Folded: expected 1 row, got %d", len(rows))
+	}
+	if rows[0][0] != IconFolded+"ctr-a" {
+		t.Errorf("Folded root = %q, want %q", rows[0][0], IconFolded+"ctr-a")
 	}
 }
