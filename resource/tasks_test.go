@@ -217,3 +217,79 @@ func TestTaskKindFoldKeyAndInitFolded(t *testing.T) {
 		t.Error("Tasks InitFolded should be nil")
 	}
 }
+
+func TestTaskKindDetail_WithProcessInfo(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{
+			ContainerID: "full-info-ctr",
+			Process: &tasktypes.Process{
+				ID:     "full-info-ctr",
+				Pid:    42,
+				Status: tasktypes.Status_RUNNING,
+			},
+			BundlePath: "/run/containerd/io.containerd.runtime.v2.task/default/full-info-ctr",
+			Cmdline:    "/usr/bin/nginx -g daemon off;",
+			StartedAt:  "2025-06-01 08:00:00",
+			Root:       "/",
+			Cwd:        "/var/www",
+			Cgroups:    []string{"0::/system.slice/containerd.service"},
+			Namespaces: map[string]string{"mnt": "mnt:[4026531840]", "pid": "pid:[4026531836]"},
+		},
+	}
+
+	_, cache := TaskKind.Rows(data, nil)
+	_, body := TaskKind.Detail(cache, 0)
+
+	checks := []string{
+		"Root:         /",
+		"Cwd:          /var/www",
+		"Cgroup:       0::/system.slice/containerd.service",
+		"Namespaces:",
+		"Cmdline:      /usr/bin/nginx -g daemon off;",
+		"Started:      2025-06-01 08:00:00",
+		"Bundle:       /run/containerd/io.containerd.runtime.v2.task/default/full-info-ctr",
+	}
+	for _, check := range checks {
+		if !strings.Contains(body, check) {
+			t.Errorf("Detail should contain %q, body:\n%s", check, body)
+		}
+	}
+}
+
+func TestTaskKindDetail_EmptyProcessInfo(t *testing.T) {
+	data := []ctr.TaskInfo{
+		{
+			ContainerID: "minimal-ctr",
+			Process: &tasktypes.Process{
+				ID:     "minimal-ctr",
+				Pid:    1,
+				Status: tasktypes.Status_RUNNING,
+			},
+		},
+	}
+
+	_, cache := TaskKind.Rows(data, nil)
+	_, body := TaskKind.Detail(cache, 0)
+
+	if strings.Contains(body, "Root:") {
+		t.Error("Empty Root should be omitted")
+	}
+	if strings.Contains(body, "Cwd:") {
+		t.Error("Empty Cwd should be omitted")
+	}
+	if strings.Contains(body, "Cgroup:") {
+		t.Error("Nil Cgroups should be omitted")
+	}
+	if strings.Contains(body, "Namespaces:") {
+		t.Error("Nil Namespaces should be omitted")
+	}
+	if strings.Contains(body, "Bundle:") {
+		t.Error("Empty BundlePath should be omitted")
+	}
+	if strings.Contains(body, "Cmdline:") {
+		t.Error("Empty Cmdline should be omitted")
+	}
+	if strings.Contains(body, "Started:") {
+		t.Error("Empty StartedAt should be omitted")
+	}
+}
