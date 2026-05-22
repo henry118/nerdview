@@ -16,6 +16,7 @@ package resource
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -162,13 +163,16 @@ func formatTaskDetail(t ctr.TaskInfo) (string, string) {
 		}
 	}
 	if len(t.Namespaces) > 0 {
-		first := true
-		for _, target := range t.Namespaces {
-			if first {
-				fmt.Fprintf(&b, "Namespaces:   %s\n", target)
-				first = false
+		keys := make([]string, 0, len(t.Namespaces))
+		for k := range t.Namespaces {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for i, k := range keys {
+			if i == 0 {
+				fmt.Fprintf(&b, "Namespaces:   %s\n", t.Namespaces[k])
 			} else {
-				fmt.Fprintf(&b, "              %s\n", target)
+				fmt.Fprintf(&b, "              %s\n", t.Namespaces[k])
 			}
 		}
 	}
