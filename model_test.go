@@ -609,7 +609,7 @@ func TestConnectionStatus_DisconnectedOnEventErr(t *testing.T) {
 	}
 }
 
-func TestConnectionStatus_DisconnectedOnUnavailable(t *testing.T) {
+func TestConnectionStatus_StaysConnectedOnNonConnectionError(t *testing.T) {
 	m := testModel()
 	m.connected = true
 

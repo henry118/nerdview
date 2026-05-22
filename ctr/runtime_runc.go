@@ -33,16 +33,16 @@ type runcHelper struct {
 	taskService tasks.TasksClient
 }
 
-func (r *runcHelper) Processes(ctx context.Context, containerID string) []ProcessEntry {
+func (r *runcHelper) Processes(ctx context.Context, containerID string) []processEntry {
 	resp, err := r.taskService.ListPids(ctx, &tasks.ListPidsRequest{
 		ContainerID: containerID,
 	})
 	if err != nil {
 		return nil
 	}
-	var entries []ProcessEntry
+	var entries []processEntry
 	for _, p := range resp.Processes {
-		entry := ProcessEntry{Pid: p.Pid}
+		entry := processEntry{Pid: p.Pid}
 		if p.Info != nil {
 			var details runcoptions.ProcessDetails
 			if err := proto.Unmarshal(p.Info.Value, &details); err == nil && details.ExecID != "" {
@@ -64,11 +64,11 @@ func (r *runcHelper) BundlePath(stateDir, ns, containerID string) string {
 	return filepath.Join(stateDir, "io.containerd.runtime.v2.task", ns, containerID)
 }
 
-func (r *runcHelper) Inspect(pid uint32) ProcessDetail {
+func (r *runcHelper) Inspect(pid uint32) processDetail {
 	if pid == 0 {
-		return ProcessDetail{}
+		return processDetail{}
 	}
-	return ProcessDetail{
+	return processDetail{
 		Cmdline:    procCmdline(pid),
 		StartedAt:  procStartTime(pid),
 		Root:       procReadlink(pid, "root"),

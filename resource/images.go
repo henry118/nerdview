@@ -199,14 +199,24 @@ func formatImageDetail(node ctr.ImageTree) (string, string) {
 	}
 	if len(node.Desc.Annotations) > 0 {
 		fmt.Fprintf(&b, "Annotations:\n")
-		for k, v := range node.Desc.Annotations {
-			fmt.Fprintf(&b, "  %s: %s\n", k, v)
+		keys := make([]string, 0, len(node.Desc.Annotations))
+		for k := range node.Desc.Annotations {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(&b, "  %s: %s\n", k, node.Desc.Annotations[k])
 		}
 	}
 	if len(node.Labels) > 0 {
 		fmt.Fprintf(&b, "Labels:\n")
-		for k, v := range node.Labels {
-			fmt.Fprintf(&b, "  %s: %s\n", k, v)
+		keys := make([]string, 0, len(node.Labels))
+		for k := range node.Labels {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(&b, "  %s: %s\n", k, node.Labels[k])
 		}
 	}
 	title := node.Name

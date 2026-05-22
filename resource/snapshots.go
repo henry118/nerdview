@@ -16,6 +16,7 @@ package resource
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -105,8 +106,13 @@ func formatSnapshotDetail(info snapshots.Info) (string, string) {
 	fmt.Fprintf(&b, "Updated: %s\n", info.Updated.Format("2006-01-02 15:04:05"))
 	if len(info.Labels) > 0 {
 		fmt.Fprintf(&b, "Labels:\n")
-		for k, v := range info.Labels {
-			fmt.Fprintf(&b, "  %s: %s\n", k, v)
+		keys := make([]string, 0, len(info.Labels))
+		for k := range info.Labels {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(&b, "  %s: %s\n", k, info.Labels[k])
 		}
 	}
 	return info.Name, b.String()

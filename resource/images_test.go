@@ -142,12 +142,12 @@ func TestImageKindFoldKey(t *testing.T) {
 
 	id := ImageKind.FoldKey(cache, 0)
 	if id == "" {
-		t.Error("RowID for nginx (index 0) should be non-empty")
+		t.Error("FoldKey for nginx (index 0) should be non-empty")
 	}
 
 	id = ImageKind.FoldKey(cache, 5)
 	if id != "" {
-		t.Errorf("RowID for alpine (no children) should be empty, got %q", id)
+		t.Errorf("FoldKey for alpine (no children) should be empty, got %q", id)
 	}
 }
 

@@ -18,7 +18,6 @@ package ctr
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -326,7 +325,7 @@ func (c *Client) Tasks(ctx context.Context, ns string) ([]TaskInfo, error) {
 				runtimeName = cInfo.Runtime.Name
 			}
 		}
-		helper := NewRuntimeHelper(runtimeName, c.inner.TaskService())
+		helper := newRuntimeHelper(runtimeName, c.inner.TaskService())
 
 		detail := helper.Inspect(p.Pid)
 		info := TaskInfo{
@@ -413,7 +412,7 @@ func (c *Client) DaemonPID(ctx context.Context) (int, error) {
 func ReadDaemonStats(pid int) (DaemonStats, error) {
 	stats := DaemonStats{PID: pid}
 
-	fields, err := daemonStatFields(pid)
+	fields, err := procStatFields(pid)
 	if err != nil {
 		return stats, err
 	}
@@ -455,7 +454,7 @@ func ReadDaemonStats(pid int) (DaemonStats, error) {
 
 	statusData, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "status"))
 	if err != nil {
-		return stats, nil
+		return stats, err
 	}
 	for line := range strings.SplitSeq(string(statusData), "\n") {
 		if strings.HasPrefix(line, "VmSize:") {
@@ -466,19 +465,6 @@ func ReadDaemonStats(pid int) (DaemonStats, error) {
 	}
 
 	return stats, nil
-}
-
-func daemonStatFields(pid int) ([]string, error) {
-	statData, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
-	if err != nil {
-		return nil, err
-	}
-	s := string(statData)
-	closeParenIdx := strings.LastIndex(s, ")")
-	if closeParenIdx < 0 {
-		return nil, fmt.Errorf("invalid /proc/stat format")
-	}
-	return strings.Fields(s[closeParenIdx+2:]), nil
 }
 
 func parseKBValue(line string) uint64 {
