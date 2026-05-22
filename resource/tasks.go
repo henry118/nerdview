@@ -105,17 +105,17 @@ func formatTaskDetail(t ctr.TaskInfo) (string, string) {
 			fmt.Fprintf(&b, "Exited At:    %s\n", p.ExitedAt.AsTime().Format("2006-01-02 15:04:05"))
 		}
 	}
-	if root := ctr.ProcessRoot(p.Pid); root != "" {
-		fmt.Fprintf(&b, "Root:         %s\n", root)
+	if t.Root != "" {
+		fmt.Fprintf(&b, "Root:         %s\n", t.Root)
 	}
-	if cwd := ctr.ProcessCwd(p.Pid); cwd != "" {
-		fmt.Fprintf(&b, "Cwd:          %s\n", cwd)
+	if t.Cwd != "" {
+		fmt.Fprintf(&b, "Cwd:          %s\n", t.Cwd)
 	}
 	if t.BundlePath != "" {
 		fmt.Fprintf(&b, "Bundle:       %s\n", t.BundlePath)
 	}
-	if cgroups := ctr.ProcessCgroup(p.Pid); len(cgroups) > 0 {
-		for i, cg := range cgroups {
+	if len(t.Cgroups) > 0 {
+		for i, cg := range t.Cgroups {
 			if i == 0 {
 				fmt.Fprintf(&b, "Cgroup:       %s\n", cg)
 			} else {
@@ -123,9 +123,9 @@ func formatTaskDetail(t ctr.TaskInfo) (string, string) {
 			}
 		}
 	}
-	if namespaces := ctr.ProcessNamespaces(p.Pid); len(namespaces) > 0 {
+	if len(t.Namespaces) > 0 {
 		first := true
-		for _, target := range namespaces {
+		for _, target := range t.Namespaces {
 			if first {
 				fmt.Fprintf(&b, "Namespaces:   %s\n", target)
 				first = false

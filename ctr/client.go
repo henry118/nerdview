@@ -18,12 +18,14 @@ package ctr
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -35,7 +37,6 @@ import (
 	"github.com/henry118/nerdview/logging"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"google.golang.org/protobuf/proto"
 )
 
 const defaultStateDir = "/run/containerd"
@@ -291,19 +292,22 @@ func walkContent(ctx context.Context, store content.Store, snLabel string, desc 
 	return result
 }
 
-// TaskInfo pairs a task process with its bundle path and proc-derived metadata.
+// TaskInfo pairs a task process with its bundle path and runtime-derived metadata.
 type TaskInfo struct {
 	ContainerID string
 	Process     *tasktypes.Process
 	ExecID      string
 	BundlePath  string
-	StartedAt   string
 	Cmdline     string
+	StartedAt   string
+	Root        string
+	Cwd         string
+	Cgroups     []string
+	Namespaces  map[string]string
 }
 
-// Tasks returns all tasks in the namespace, each enriched with the
-// container's OCI runtime spec and computed bundle path. Exec processes are
-// included as separate entries with ExecID set.
+// Tasks returns all tasks in the namespace, each enriched with runtime-specific
+// process metadata. Exec processes are included as separate entries.
 func (c *Client) Tasks(ctx context.Context, ns string) ([]TaskInfo, error) {
 	ctx = namespaces.WithNamespace(ctx, ns)
 	resp, err := c.inner.TaskService().List(ctx, &tasks.ListTasksRequest{})
@@ -314,63 +318,49 @@ func (c *Client) Tasks(ctx context.Context, ns string) ([]TaskInfo, error) {
 	logging.Debug("loaded %d tasks in ns=%s", len(resp.Tasks), ns)
 	var result []TaskInfo
 	for _, p := range resp.Tasks {
-		info := TaskInfo{ContainerID: p.ID, Process: p}
-		info.StartedAt = ProcessStartTime(p.Pid)
-		info.Cmdline = ProcessCmdline(p.Pid)
+		runtimeName := ""
 		container, err := c.inner.LoadContainer(ctx, p.ID)
 		if err == nil {
 			cInfo, err := container.Info(ctx)
 			if err == nil {
-				info.BundlePath = filepath.Join(c.StateDir(), cInfo.Runtime.Name, ns, p.ID)
+				runtimeName = cInfo.Runtime.Name
 			}
+		}
+		helper := NewRuntimeHelper(runtimeName, c.inner.TaskService())
+
+		detail := helper.Inspect(p.Pid)
+		info := TaskInfo{
+			ContainerID: p.ID,
+			Process:     p,
+			BundlePath:  helper.BundlePath(c.StateDir(), ns, p.ID),
+			Cmdline:     detail.Cmdline,
+			StartedAt:   detail.StartedAt,
+			Root:        detail.Root,
+			Cwd:         detail.Cwd,
+			Cgroups:     detail.Cgroups,
+			Namespaces:  detail.Namespaces,
 		}
 		result = append(result, info)
 
-		execIDs := c.execIDs(ctx, p.ID)
-		if len(execIDs) > 0 {
-			logging.Debug("found %d exec(s) for container %s", len(execIDs), p.ID)
-		}
-		for _, execID := range execIDs {
-			execResp, err := c.inner.TaskService().Get(ctx, &tasks.GetRequest{
-				ContainerID: p.ID,
-				ExecID:      execID,
-			})
-			if err != nil {
+		for _, proc := range helper.Processes(ctx, p.ID) {
+			if !proc.IsExec {
 				continue
 			}
+			execDetail := helper.Inspect(proc.Pid)
 			result = append(result, TaskInfo{
 				ContainerID: p.ID,
-				Process:     execResp.Process,
-				ExecID:      execID,
-				StartedAt:   ProcessStartTime(execResp.Process.Pid),
-				Cmdline:     ProcessCmdline(execResp.Process.Pid),
+				Process:     &tasktypes.Process{ID: p.ID, Pid: proc.Pid, Status: p.Status},
+				ExecID:      proc.ID,
+				Cmdline:     execDetail.Cmdline,
+				StartedAt:   execDetail.StartedAt,
+				Root:        execDetail.Root,
+				Cwd:         execDetail.Cwd,
+				Cgroups:     execDetail.Cgroups,
+				Namespaces:  execDetail.Namespaces,
 			})
 		}
 	}
 	return result, nil
-}
-
-func (c *Client) execIDs(ctx context.Context, containerID string) []string {
-	resp, err := c.inner.TaskService().ListPids(ctx, &tasks.ListPidsRequest{
-		ContainerID: containerID,
-	})
-	if err != nil {
-		return nil
-	}
-	var execIDs []string
-	for _, p := range resp.Processes {
-		if p.Info == nil {
-			continue
-		}
-		var details runcoptions.ProcessDetails
-		if err := proto.Unmarshal(p.Info.Value, &details); err != nil {
-			continue
-		}
-		if details.ExecID != "" {
-			execIDs = append(execIDs, details.ExecID)
-		}
-	}
-	return execIDs
 }
 
 // Snapshotters returns the names of all available snapshotter plugins.
@@ -384,4 +374,118 @@ func (c *Client) Snapshotters(ctx context.Context) ([]string, error) {
 		names = append(names, p.ID)
 	}
 	return names, nil
+}
+
+// DaemonStats holds resource usage metrics for the containerd daemon process.
+type DaemonStats struct {
+	PID int
+	// Current CPU usage percentage (like htop, per-core).
+	CPUPct float64
+	// Virtual memory size in bytes.
+	VMS uint64
+	// Resident set size in bytes.
+	RSS uint64
+	// Number of threads.
+	Threads int
+	// Time since process start.
+	Uptime time.Duration
+}
+
+var prevCPUSample struct {
+	ticks uint64
+	time  time.Time
+}
+
+// DaemonPID returns the containerd daemon's PID via the introspection API.
+func (c *Client) DaemonPID(ctx context.Context) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
+	defer cancel()
+	resp, err := c.inner.IntrospectionService().Server(ctx)
+	if err != nil {
+		logging.Error("failed to get daemon PID via introspection: %v", err)
+		return 0, err
+	}
+	logging.Debug("daemon PID=%d", resp.Pid)
+	return int(resp.Pid), nil
+}
+
+// ReadDaemonStats reads CPU, memory, thread, and uptime info from /proc for the given PID.
+func ReadDaemonStats(pid int) (DaemonStats, error) {
+	stats := DaemonStats{PID: pid}
+
+	fields, err := daemonStatFields(pid)
+	if err != nil {
+		return stats, err
+	}
+	if len(fields) > 19 {
+		utime, _ := strconv.ParseUint(fields[11], 10, 64)
+		stime, _ := strconv.ParseUint(fields[12], 10, 64)
+		numThreads, _ := strconv.Atoi(fields[17])
+		starttime, _ := strconv.ParseUint(fields[19], 10, 64)
+
+		stats.Threads = numThreads
+
+		clkTck := uint64(100)
+		totalTicks := utime + stime
+		now := time.Now()
+
+		if !prevCPUSample.time.IsZero() {
+			elapsed := now.Sub(prevCPUSample.time).Seconds()
+			if elapsed > 0 {
+				deltaTicks := totalTicks - prevCPUSample.ticks
+				stats.CPUPct = (float64(deltaTicks) / float64(clkTck)) / elapsed * 100.0
+			}
+		}
+		prevCPUSample.ticks = totalTicks
+		prevCPUSample.time = now
+
+		uptimeData, err := os.ReadFile("/proc/uptime")
+		if err == nil {
+			uptimeFields := strings.Fields(string(uptimeData))
+			if len(uptimeFields) > 0 {
+				systemUptime, _ := strconv.ParseFloat(uptimeFields[0], 64)
+				procStartSec := float64(starttime) / float64(clkTck)
+				procUptime := systemUptime - procStartSec
+				if procUptime > 0 {
+					stats.Uptime = time.Duration(procUptime * float64(time.Second))
+				}
+			}
+		}
+	}
+
+	statusData, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "status"))
+	if err != nil {
+		return stats, nil
+	}
+	for line := range strings.SplitSeq(string(statusData), "\n") {
+		if strings.HasPrefix(line, "VmSize:") {
+			stats.VMS = parseKBValue(line)
+		} else if strings.HasPrefix(line, "VmRSS:") {
+			stats.RSS = parseKBValue(line)
+		}
+	}
+
+	return stats, nil
+}
+
+func daemonStatFields(pid int) ([]string, error) {
+	statData, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	if err != nil {
+		return nil, err
+	}
+	s := string(statData)
+	closeParenIdx := strings.LastIndex(s, ")")
+	if closeParenIdx < 0 {
+		return nil, fmt.Errorf("invalid /proc/stat format")
+	}
+	return strings.Fields(s[closeParenIdx+2:]), nil
+}
+
+func parseKBValue(line string) uint64 {
+	fields := strings.Fields(line)
+	if len(fields) >= 2 {
+		val, _ := strconv.ParseUint(fields[1], 10, 64)
+		return val * 1024
+	}
+	return 0
 }
