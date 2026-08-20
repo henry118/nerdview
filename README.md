@@ -1,7 +1,6 @@
 # nerdview
 
 [![CI](https://github.com/henry118/nerdview/actions/workflows/ci.yml/badge.svg)](https://github.com/henry118/nerdview/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/henry118/nerdview)](https://goreportcard.com/report/github.com/henry118/nerdview)
 [![License](https://img.shields.io/github/license/henry118/nerdview)](LICENSE)
 
 A read-only terminal UI for inspecting [containerd](https://containerd.io/) resources. Browse images, containers, tasks, snapshots, and events — without modifying anything.
