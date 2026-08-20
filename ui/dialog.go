@@ -17,9 +17,9 @@ package ui
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // DialogModel is a scrollable overlay dialog for displaying resource details.
@@ -35,7 +35,7 @@ type DialogModel struct {
 
 // NewDialog creates a dialog with initial terminal dimensions.
 func NewDialog(termW, termH int) DialogModel {
-	vp := viewport.New(30, 5)
+	vp := viewport.New(viewport.WithWidth(30), viewport.WithHeight(5))
 	return DialogModel{
 		viewport: vp,
 		termW:    termW,
@@ -83,8 +83,8 @@ func (d *DialogModel) resize() {
 
 	d.width = w
 	d.height = h
-	d.viewport.Width = w
-	d.viewport.Height = h
+	d.viewport.SetWidth(w)
+	d.viewport.SetHeight(h)
 }
 
 func (d DialogModel) Update(msg tea.Msg) (DialogModel, tea.Cmd) {

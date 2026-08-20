@@ -19,7 +19,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
+	"charm.land/bubbles/v2/table"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/henry118/nerdview/ctr"
 )

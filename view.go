@@ -19,16 +19,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/henry118/nerdview/resource"
 	"github.com/henry118/nerdview/ui"
 )
 
 // View renders the full TUI frame.
-func (m model) View() string {
+func (m model) View() tea.View {
 	if m.width == 0 {
-		return "Loading..."
+		return tea.NewView("Loading...")
 	}
 
 	// Stats bar: namespace + daemon metrics
@@ -112,7 +113,9 @@ func (m model) View() string {
 		)
 	}
 
-	return content
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
 }
 
 // overlaySelector renders a centered selector popup for namespaces or snapshotters.

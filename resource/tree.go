@@ -17,7 +17,7 @@ package resource
 import (
 	"sort"
 
-	"github.com/charmbracelet/bubbles/table"
+	"charm.land/bubbles/v2/table"
 )
 
 // Tree display characters for hierarchical views.

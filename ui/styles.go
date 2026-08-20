@@ -14,7 +14,7 @@
 
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 var (
 	// StyleHeaderNS is the namespace label style in the stats bar.

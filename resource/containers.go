@@ -20,7 +20,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
+	"charm.land/bubbles/v2/table"
 	"github.com/henry118/nerdview/ctr"
 )
 

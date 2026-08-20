@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/errdefs"
 
@@ -299,14 +299,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tickCmd(),
 		)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 	return m, nil
 }
 
 // handleKey dispatches key events to the active mode handler.
-func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch m.mode {
 	case modeDialog:
 		return m.handleDialogKey(msg)
@@ -320,7 +320,7 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleDialogKey handles keys when the detail popup is open.
-func (m model) handleDialogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleDialogKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
 		m.mode = modeNormal
@@ -333,7 +333,7 @@ func (m model) handleDialogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleNSSelectKey handles keys in the namespace selector overlay.
-func (m model) handleNSSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleNSSelectKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
 		m.mode = modeNormal
@@ -360,7 +360,7 @@ func (m model) handleNSSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleSnapshotterSelectKey handles keys in the snapshotter selector overlay.
-func (m model) handleSnapshotterSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleSnapshotterSelectKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
 		m.mode = modeNormal
@@ -385,7 +385,7 @@ func (m model) handleSnapshotterSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleNormalKey handles keys in the default table navigation mode.
-func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit), key.Matches(msg, keys.Escape):
 		return m, tea.Quit
