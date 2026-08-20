@@ -18,7 +18,7 @@ import (
 	"context"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	_ "github.com/containerd/containerd/api/events" // register protobuf event types
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/typeurl/v2"

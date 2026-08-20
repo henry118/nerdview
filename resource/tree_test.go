@@ -17,7 +17,7 @@ package resource
 import (
 	"testing"
 
-	"github.com/charmbracelet/bubbles/table"
+	"charm.land/bubbles/v2/table"
 )
 
 type testItem struct {

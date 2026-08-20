@@ -21,7 +21,7 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
+	"charm.land/bubbles/v2/table"
 	"github.com/henry118/nerdview/logging"
 	"github.com/henry118/nerdview/ui"
 )

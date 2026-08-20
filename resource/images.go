@@ -19,7 +19,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
+	"charm.land/bubbles/v2/table"
 	ctdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/henry118/nerdview/ctr"
 )

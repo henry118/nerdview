@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 func TestHelpView_ContainsKeys(t *testing.T) {

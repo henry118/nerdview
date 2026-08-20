@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/henry118/nerdview/ctr"
 	"github.com/henry118/nerdview/logging"
@@ -58,7 +58,7 @@ func main() {
 	logging.Info("event stream started")
 
 	m := newModel(ctx, client, *namespace)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		logging.Error("program exited with error: %v", err)
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)

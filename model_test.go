@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -84,7 +84,7 @@ func TestGoToContainerToSnapshot(t *testing.T) {
 	m.activeRes = tabContainers
 	m.resources[tabContainers].Table.Focus()
 
-	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	goToKey := tea.KeyPressMsg{Code: 'g', Text: "g"}
 	newModel, _ := m.Update(goToKey)
 	m = newModel.(model)
 
@@ -105,7 +105,7 @@ func TestGoToContainerToSnapshot(t *testing.T) {
 	}
 
 	// GoBack should return to containers tab
-	backKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}}
+	backKey := tea.KeyPressMsg{Code: 'b', Text: "b"}
 	newModel, _ = m.Update(backKey)
 	m = newModel.(model)
 
@@ -148,7 +148,7 @@ func TestGoToTaskToContainer(t *testing.T) {
 	m.activeRes = tabTasks
 	m.resources[tabTasks].Table.Focus()
 
-	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	goToKey := tea.KeyPressMsg{Code: 'g', Text: "g"}
 	newModel, _ := m.Update(goToKey)
 	m = newModel.(model)
 
@@ -166,7 +166,7 @@ func TestGoToTaskToContainer(t *testing.T) {
 	}
 
 	// GoBack
-	backKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}}
+	backKey := tea.KeyPressMsg{Code: 'b', Text: "b"}
 	newModel, _ = m.Update(backKey)
 	m = newModel.(model)
 	if m.activeRes != tabTasks {
@@ -205,7 +205,7 @@ func TestGoToImageToSnapshot(t *testing.T) {
 	m.activeRes = tabImages
 	m.resources[tabImages].Table.Focus()
 
-	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	goToKey := tea.KeyPressMsg{Code: 'g', Text: "g"}
 	newModel, _ := m.Update(goToKey)
 	m = newModel.(model)
 
@@ -224,7 +224,7 @@ func TestGoToImageToSnapshot(t *testing.T) {
 	}
 
 	// GoBack
-	backKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}}
+	backKey := tea.KeyPressMsg{Code: 'b', Text: "b"}
 	newModel, _ = m.Update(backKey)
 	m = newModel.(model)
 	if m.activeRes != tabImages {
@@ -282,7 +282,7 @@ func TestGoToUnfoldsHiddenSnapshot(t *testing.T) {
 	m.activeRes = tabContainers
 	m.resources[tabContainers].Table.Focus()
 
-	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	goToKey := tea.KeyPressMsg{Code: 'g', Text: "g"}
 	newModel, _ := m.Update(goToKey)
 	m = newModel.(model)
 
@@ -347,7 +347,7 @@ func TestGoToUnfoldsOnlyTargetAncestor(t *testing.T) {
 	// Navigate to snapshot from container
 	m.activeRes = tabContainers
 	m.resources[tabContainers].Table.Focus()
-	goToKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
+	goToKey := tea.KeyPressMsg{Code: 'g', Text: "g"}
 	newModel, _ := m.Update(goToKey)
 	m = newModel.(model)
 
@@ -385,7 +385,7 @@ func TestTabSwitchForward(t *testing.T) {
 		t.Fatalf("Expected initial tab to be images (%d), got %d", tabImages, m.activeRes)
 	}
 
-	tabKey := tea.KeyMsg{Type: tea.KeyTab}
+	tabKey := tea.KeyPressMsg{Code: tea.KeyTab}
 
 	newModel, _ := m.Update(tabKey)
 	m = newModel.(model)
@@ -424,7 +424,7 @@ func TestTabSwitchBackward(t *testing.T) {
 	m.width = 80
 	m.height = 24
 
-	shiftTabKey := tea.KeyMsg{Type: tea.KeyShiftTab}
+	shiftTabKey := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 
 	newModel, _ := m.Update(shiftTabKey)
 	m = newModel.(model)
@@ -562,7 +562,7 @@ func TestEventsClearedOnNamespaceSwitch(t *testing.T) {
 	m.mode = modeNSSelect
 	m.nsCursor = 1
 
-	enterKey := tea.KeyMsg{Type: tea.KeyEnter}
+	enterKey := tea.KeyPressMsg{Code: tea.KeyEnter}
 	newModel, _ := m.Update(enterKey)
 	m = newModel.(model)
 
