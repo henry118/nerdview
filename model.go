@@ -138,11 +138,12 @@ func newModel(ctx context.Context, client *ctr.Client, namespace string) model {
 }
 
 // Init starts background data loading, event subscription, and periodic refresh.
+// Namespaces, snapshotters, and resources are loaded in that order (each depends
+// on the active namespace/snapshotter being finalized by the previous step) so
+// that the initial resource load never races the namespace/snapshotter reload.
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		loadNamespaces(m.ctx, m.client),
-		loadSnapshotters(m.ctx, m.client),
-		loadResources(m.ctx, m.client, m.namespaces[m.activeNS], m.snapshotter),
 		ctr.WaitForEvent(m.ctx, m.client),
 		initDaemonStats(m.ctx, m.client),
 		tickCmd(),
@@ -178,11 +179,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 		}
-		return m, nil
+		return m, loadSnapshotters(m.ctx, m.client)
 
 	case snapshottersLoadedMsg:
 		m.snapshotters = msg.snapshotters
-		return m, nil
+		return m, loadResources(m.ctx, m.client, m.namespaces[m.activeNS], m.snapshotter)
 
 	case resourcesLoadedMsg:
 		if msg.namespace == m.namespaces[m.activeNS] {
@@ -234,8 +235,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		logging.Info("reconnected to containerd")
 		return m, tea.Batch(
 			loadNamespaces(m.ctx, m.client),
-			loadSnapshotters(m.ctx, m.client),
-			loadResources(m.ctx, m.client, m.namespaces[m.activeNS], m.snapshotter),
 			ctr.WaitForEvent(m.ctx, m.client),
 		)
 
