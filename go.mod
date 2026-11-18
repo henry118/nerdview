@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.1
 	github.com/containerd/containerd/api v1.8.0
 	github.com/containerd/containerd/v2 v2.0.8
 	github.com/containerd/errdefs v1.0.0
